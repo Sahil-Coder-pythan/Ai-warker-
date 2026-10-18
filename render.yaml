@@ -1,11 +1,13 @@
 services:
   - type: web
     name: github-worker
-    runtime: python
+    env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --workers 1 --bind 0.0.0.0:$PORT
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120
     envVars:
       - key: GITHUB_TOKEN
         sync: false
       - key: ADMIN_PASSWORD
         sync: false
+      - key: SECRET_KEY
+        generateValue: true
