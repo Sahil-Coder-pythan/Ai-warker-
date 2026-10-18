@@ -1,523 +1,742 @@
 
 import os
-import io
 import re
+import io
 import json
-import time
+import uuid
 import base64
-import secrets
 import zipfile
+import hashlib
 import requests
-from urllib.parse import urlparse
-from flask import Flask, request, jsonify, render_template_string
+
+from flask import (
+    Flask, request, render_template_string,
+    redirect, url_for, session
+)
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
+app.secret_key = os.environ.get("SECRET_KEY", os.urandom(32))
 
-TOKEN = os.getenv("GITHUB_TOKEN", "")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
+
+MAX_ZIP_SIZE = 25 * 1024 * 1024
+MAX_TOTAL_SIZE = 50 * 1024 * 1024
 MAX_FILES = 500
-MAX_TOTAL = 50 * 1024 * 1024
-MAX_FILE = 5 * 1024 * 1024
+MAX_FILE_SIZE = 5 * 1024 * 1024
+
+# Render par ek worker rakho, taaki preview data
+# preview aur apply ke beech memory mein available rahe.
 PREVIEWS = {}
 
-BLOCKED_PARTS = {".git", "node_modules", "__pycache__"}
-BLOCKED_NAMES = {".env", ".DS_Store"}
+SKIP_NAMES = {
+    ".git", "node_modules", "__pycache__", ".env",
+    ".DS_Store", ".pytest_cache", ".venv", "venv"
+}
+
+SKIP_EXTENSIONS = {".pyc", ".pyo"}
 
 
-def headers():
+PAGE = """
+<!doctype html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GitHub Worker</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;background:#0b1020;color:#e8edff;
+ font-family:Arial,sans-serif;padding:18px
+}
+main{max-width:850px;margin:auto}
+.card{
+ background:#141c31;border:1px solid #293653;
+ border-radius:16px;padding:18px;margin-bottom:16px
+}
+h1{font-size:27px;margin:5px 0 10px}
+h2{font-size:19px}
+p{color:#aebcda;line-height:1.6}
+label{display:block;margin:15px 0 7px;font-weight:bold}
+input,textarea,select{
+ width:100%;padding:13px;border-radius:9px;
+ border:1px solid #394968;background:#0b1326;
+ color:white;font-size:15px
+}
+textarea{min-height:180px;resize:vertical;font-family:monospace}
+button{
+ width:100%;padding:14px;border:0;border-radius:10px;
+ background:#5877ff;color:white;font-weight:bold;
+ font-size:16px;margin-top:16px
+}
+.secondary{background:#293653}
+.item{
+ background:#0b1326;border-radius:9px;
+ padding:11px;margin:8px 0;overflow-wrap:anywhere
+}
+.ok{color:#76efb2}.warn{color:#ffd27b}.bad{color:#ff9393}
+small{color:#aebcda}
+a{color:#9fb6ff}
+</style>
+</head>
+<body>
+<main>
+<div class="card">
+<h1>GitHub Worker</h1>
+<p>ZIP upload → automatic file matching → preview → GitHub commit.</p>
+<p>GitHub token server ke Environment mein GITHUB_TOKEN ke naam se
+hona chahiye. Is page par token paste mat karna.</p>
+</div>
+
+{% if error %}
+<div class="card"><p class="bad">{{ error }}</p></div>
+{% endif %}
+
+{% if result %}
+<div class="card">
+<h2>Preview Result</h2>
+<p>{{ result.message }}</p>
+
+<h3>Upload / Update ({{ result.uploads|length }})</h3>
+{% for name in result.uploads %}
+<div class="item">＋ {{ name }}</div>
+{% else %}
+<p>No upload files.</p>
+{% endfor %}
+
+<h3>Delete ({{ result.deletes|length }})</h3>
+{% for name in result.deletes %}
+<div class="item warn">− {{ name }}</div>
+{% else %}
+<p>No files to delete.</p>
+{% endfor %}
+
+{% if result.warnings %}
+<h3>Warnings</h3>
+{% for warning in result.warnings %}
+<div class="item warn">{{ warning }}</div>
+{% endfor %}
+{% endif %}
+
+{% if result.token %}
+<p class="warn">
+Review the list carefully. Applying changes will create a GitHub commit.
+</p>
+<form method="post" action="/apply">
+<input type="hidden" name="password" value="{{ password }}">
+<input type="hidden" name="preview_id" value="{{ result.token }}">
+<button type="submit">Confirm and Apply to GitHub</button>
+</form>
+{% endif %}
+</div>
+{% endif %}
+
+<div class="card">
+<h2>1. Admin Access</h2>
+<form method="post" action="/preview" enctype="multipart/form-data">
+<label>Admin Password</label>
+<input type="password" name="password" required
+ placeholder="ADMIN_PASSWORD value" autocomplete="current-password">
+
+<label>GitHub Repository</label>
+<input name="repo" required
+ placeholder="Sahil-Coder-pythan/ai-builder"
+ value="{{ repo or '' }}">
+
+<label>ZIP File</label>
+<input type="file" name="zip_file" accept=".zip,application/zip" required>
+
+<label>Action</label>
+<select name="mode">
+<option value="replace" {% if mode == 'replace' %}selected{% endif %}>
+REPLACE — upload mapped files and remove other tracked files
+</option>
+<option value="upload" {% if mode == 'upload' %}selected{% endif %}>
+UPLOAD — only add or update mapped files
+</option>
+</select>
+
+<label>File Mapping — one GitHub path per line</label>
+<textarea name="file_map" required
+ placeholder="app.py&#10;requirements.txt&#10;render.yaml&#10;README.md&#10;public/index.html&#10;public/chat.html&#10;public/style.css&#10;public/app.js">{{ file_map or '' }}</textarea>
+
+<p><small>
+ZIP ke andar extra root folder ho, jaise ai-builder/app.py,
+toh bhi matching automatically try hogi.
+Tree drawing (├──, └──) ki zarurat nahi.
+Folders ke naam nahi, actual files ke paths likho.
+</small></p>
+
+<button type="submit">Analyze ZIP and Preview</button>
+</form>
+</div>
+
+<div class="card">
+<h2>Rules</h2>
+<p>• UPLOAD existing unmapped files ko nahi hatata.</p>
+<p>• REPLACE unmapped tracked files ko delete kar sakta hai.</p>
+<p>• Preview check kiye bina Apply mat karna.</p>
+<p>• ZIP mein duplicate file names hon aur matching ambiguous ho,
+toh system error dega, guess nahi karega.</p>
+</div>
+</main>
+</body>
+</html>
+"""
+
+
+def render_page(error=None, result=None, repo="", mode="replace",
+                file_map="", password=""):
+    return render_template_string(
+        PAGE,
+        error=error,
+        result=result,
+        repo=repo,
+        mode=mode,
+        file_map=file_map,
+        password=password
+    )
+
+
+def github_headers():
+    if not GITHUB_TOKEN:
+        raise ValueError(
+            "Render Environment mein GITHUB_TOKEN missing hai."
+        )
+
     return {
-        "Authorization": f"Bearer {TOKEN}",
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
         "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
+        "X-GitHub-Api-Version": "2022-11-28"
     }
 
 
-def gh(method, api, path, **kwargs):
-    r = requests.request(
-        method, api + path, headers=headers(), timeout=25, **kwargs
-    )
-    if not r.ok:
-        raise RuntimeError(
-            f"GitHub API error {r.status_code}: {r.text[:350]}"
-        )
-    if r.status_code == 204 or not r.content:
-        return {}
-    return r.json()
-
-
-def authorized():
-    return bool(ADMIN_PASSWORD) and secrets.compare_digest(
-        request.headers.get("X-Admin-Password", ""),
-        ADMIN_PASSWORD
+def github_request(method, endpoint, **kwargs):
+    response = requests.request(
+        method,
+        "https://api.github.com" + endpoint,
+        headers=github_headers(),
+        timeout=60,
+        **kwargs
     )
 
+    if not response.ok:
+        try:
+            detail = response.json().get("message", response.text)
+        except Exception:
+            detail = response.text
 
-def repo_details(link):
-    if not TOKEN:
-        raise ValueError("Render Environment mein GITHUB_TOKEN set karo.")
-
-    u = urlparse(link.strip())
-    if u.scheme != "https" or u.hostname != "github.com":
-        raise ValueError("Sirf https://github.com/OWNER/REPO link do.")
-
-    parts = u.path.strip("/").split("/")
-    if len(parts) < 2:
-        raise ValueError("Repository link adhura hai.")
-
-    owner = parts[0]
-    repo = parts[1].removesuffix(".git")
-    if not re.fullmatch(r"[A-Za-z0-9_.-]+", owner):
-        raise ValueError("Invalid repository owner.")
-    if not re.fullmatch(r"[A-Za-z0-9_.-]+", repo):
-        raise ValueError("Invalid repository name.")
-
-    api = f"https://api.github.com/repos/{owner}/{repo}"
-
-    # Verify the token's identity and allow only personal repos
-    # owned by that authenticated account.
-    me = requests.get(
-        "https://api.github.com/user", headers=headers(), timeout=20
-    )
-    if not me.ok:
-        raise ValueError("GitHub token invalid hai ya access nahi mila.")
-
-    username = me.json().get("login", "").lower()
-    details = gh("GET", api, "")
-    actual_owner = details.get("owner", {}).get("login", "").lower()
-
-    if actual_owner != username:
         raise ValueError(
-            "Safety rule: sirf token-owner ki apni personal repositories allowed hain."
+            f"GitHub API error ({response.status_code}): {detail}"
         )
-    if details.get("disabled"):
-        raise ValueError("Repository disabled hai.")
 
-    branch = details.get("default_branch") or "main"
-    return api, owner, repo, branch
+    if response.status_code == 204:
+        return {}
+
+    return response.json()
 
 
-def clean_path(value):
-    p = value.strip().replace("\\", "/").lstrip("/")
-    parts = p.split("/")
-    if not p or any(x in ("", ".", "..") for x in parts):
-        raise ValueError(f"Invalid path: {value}")
-    if any(x in BLOCKED_PARTS for x in parts):
-        raise ValueError(f"Blocked path: {value}")
-    if parts[-1] in BLOCKED_NAMES or parts[-1].endswith(".pyc"):
-        raise ValueError(f"Blocked file: {value}")
+def check_password(password):
+    if not ADMIN_PASSWORD:
+        raise ValueError(
+            "Render Environment mein ADMIN_PASSWORD set nahi hai."
+        )
+
+    if not password or password != ADMIN_PASSWORD:
+        raise ValueError("Admin password galat hai.")
+
+
+def parse_repo(value):
+    value = (value or "").strip().rstrip("/")
+    value = re.sub(r"^https?://github\\.com/", "", value)
+    value = value.removesuffix(".git")
+
+    parts = value.split("/")
+
+    if len(parts) != 2 or not all(parts):
+        raise ValueError(
+            "Repo format galat hai. Example: owner/repository"
+        )
+
+    owner, repo = parts
+
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", owner):
+        raise ValueError("GitHub owner name invalid hai.")
+
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", repo):
+        raise ValueError("GitHub repository name invalid hai.")
+
+    return owner, repo
+
+
+def get_owned_repo(repo_value):
+    owner, repo = parse_repo(repo_value)
+
+    user = github_request("GET", "/user")
+    if user.get("login", "").lower() != owner.lower():
+        raise ValueError(
+            "Yeh Worker sirf token owner ke apne personal repository "
+            "ke liye configured hai. Repo owner aur token owner check karo."
+        )
+
+    data = github_request("GET", f"/repos/{owner}/{repo}")
+
+    if data.get("private") is False:
+        # Public repos are allowed too, as long as the token owner owns it.
+        pass
+
+    return owner, repo, data
+
+
+def clean_zip_path(path):
+    path = path.replace("\\", "/").strip()
+    path = path.lstrip("./")
+
+    parts = []
+    for part in path.split("/"):
+        if part in ("", "."):
+            continue
+        if part == "..":
+            return None
+        parts.append(part)
+
+    if not parts:
+        return None
+
+    if any(part in SKIP_NAMES for part in parts):
+        return None
+
+    if parts[-1].lower().endswith(tuple(SKIP_EXTENSIONS)):
+        return None
+
     return "/".join(parts)
 
 
-def parse_map(text):
-    mapping = {}
-    folder = ""
+def parse_mapping(raw):
+    """
+    Mapping ke har line se GitHub destination path nikalo.
+    Tree characters, bullets, backticks aur comments tolerate karta hai.
+    """
+    output = []
+    seen = set()
 
-    for raw in text.splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#"):
+    for line in (raw or "").splitlines():
+        line = line.strip()
+
+        if not line or line.startswith("```"):
             continue
 
-        if "->" in line:
-            src, dst = line.split("->", 1)
-            src = src.strip().lstrip("- ").strip()
-            mapping[src] = clean_path(dst)
+        # Common tree drawing prefixes.
+        line = re.sub(r"^[\\s│├└─|+`>*-]+", "", line).strip()
+
+        # Ignore comments / explanatory arrows.
+        line = re.split(r"\\s(?:←|#)\\s*", line, maxsplit=1)[0].strip()
+
+        line = line.strip("`'\\\" ")
+        line = line.replace("\\", "/").strip()
+
+        # Directory headings aren't uploadable files.
+        if not line or line.endswith("/"):
             continue
 
-        if line.upper() == "ROOT:":
-            folder = ""
+        # Remove accidental leading "./".
+        while line.startswith("./"):
+            line = line[2:]
+
+        # Do not accept absolute or parent-traversal paths.
+        if line.startswith("/") or ".." in line.split("/"):
+            raise ValueError(f"Mapping path unsafe hai: {line}")
+
+        # Ignore a standalone repository-root heading.
+        if line.lower() in ("ai-builder", "root", "public"):
             continue
 
-        if line.endswith(":"):
-            folder = line[:-1].strip().strip("/")
-            if folder.upper() == "ROOT":
-                folder = ""
-            elif folder:
-                clean_path(folder + "/placeholder")
-            continue
+        if line not in seen:
+            output.append(line)
+            seen.add(line)
 
-        filename = line.lstrip("-* ").strip()
-        if filename:
-            dst = f"{folder}/{filename}" if folder else filename
-            mapping[filename] = clean_path(dst)
+    if not output:
+        raise ValueError(
+            "File mapping empty hai. Har line par ek file path likho."
+        )
 
-    if not mapping:
-        raise ValueError("Upload/Replace ke liye file map zaroori hai.")
+    if len(output) > MAX_FILES:
+        raise ValueError(f"Maximum {MAX_FILES} mapping paths allowed hain.")
 
-    if len(set(mapping.values())) != len(mapping):
-        raise ValueError("Map mein duplicate destination paths hain.")
-    return mapping
+    return output
 
 
-def read_upload(upload):
-    if not upload or not upload.filename:
-        raise ValueError("ZIP ya file select karo.")
+def read_zip(zip_bytes):
+    files = {}
+    warnings = []
+    total_size = 0
 
-    raw = upload.read()
-    if not raw:
-        raise ValueError("Uploaded file khaali hai.")
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(zip_bytes))
+    except zipfile.BadZipFile:
+        raise ValueError("Uploaded file valid ZIP nahi hai.")
 
-    if upload.filename.lower().endswith(".zip"):
-        try:
-            z = zipfile.ZipFile(io.BytesIO(raw))
-        except zipfile.BadZipFile:
-            raise ValueError("ZIP file valid nahi hai.")
-
-        result = {}
-        total = 0
-        for info in z.infolist():
-            if info.is_dir():
-                continue
-            if info.flag_bits & 1:
-                raise ValueError("Password-protected ZIP supported nahi hai.")
-            name = info.filename.replace("\\", "/")
-            if name.startswith("/") or ".." in name.split("/"):
-                raise ValueError(f"Unsafe ZIP path: {name}")
-            if any(p in BLOCKED_PARTS for p in name.split("/")):
-                continue
-            if name.split("/")[-1] in BLOCKED_NAMES:
-                continue
-            if name.endswith(".pyc"):
-                continue
-            if info.file_size > MAX_FILE:
-                raise ValueError(f"File 5 MB se badi hai: {name}")
-
-            total += info.file_size
-            if total > MAX_TOTAL:
-                raise ValueError("ZIP extract limit 50 MB hai.")
-            if len(result) >= MAX_FILES:
-                raise ValueError("ZIP mein 500 se zyada files hain.")
-
-            if name in result:
-                raise ValueError(f"ZIP mein duplicate path: {name}")
-            result[name] = z.read(info)
-
-        if not result:
-            raise ValueError("ZIP mein usable files nahi mili.")
-        return result
-
-    # A standalone file can be uploaded with a map such as:
-    # README.md -> README.md
-    return {upload.filename: raw}
-
-
-def map_files(raw_files, mapping):
-    mapped = {}
-    used = set()
-    missing = []
-
-    for source, destination in mapping.items():
-        hits = [
-            p for p in raw_files
-            if p == source or p.split("/")[-1] == source
+    with archive:
+        entries = [
+            info for info in archive.infolist()
+            if not info.is_dir()
         ]
-        if len(hits) > 1:
-            raise ValueError(
-                f"{source} multiple files se match hota hai: {hits}. "
-                "Map mein ZIP ka exact source path likho."
-            )
-        if not hits:
-            missing.append(source)
-            continue
 
-        src = hits[0]
-        if src in used:
-            raise ValueError(f"Ek ZIP file multiple baar map hui: {src}")
-        used.add(src)
-        mapped[destination] = raw_files[src]
+        if len(entries) > MAX_FILES:
+            raise ValueError(f"ZIP mein maximum {MAX_FILES} files allowed hain.")
 
-    extras = sorted(set(raw_files) - used)
-    if missing:
-        raise ValueError(f"Map wali files missing hain: {missing}")
-    if extras:
-        raise ValueError(f"ZIP ki kuch files map nahi hui: {extras}")
-    return mapped
+        for info in entries:
+            original = info.filename.replace("\\", "/")
 
+            if original.startswith("/") or ".." in original.split("/"):
+                warnings.append(f"Unsafe ZIP path skipped: {original}")
+                continue
 
-def get_head_tree(api, branch):
-    ref = gh("GET", api, f"/git/ref/heads/{branch}")
-    head = ref["object"]["sha"]
-    commit = gh("GET", api, f"/git/commits/{head}")
-    tree_sha = commit["tree"]["sha"]
-    tree = gh("GET", api, "/git/trees/" + tree_sha,
-              params={"recursive": "1"})
-    if tree.get("truncated"):
-        raise ValueError("Repository tree bahut bada hai; safe operation roka.")
-    blobs = {
-        x["path"]: x for x in tree.get("tree", [])
-        if x["type"] == "blob"
-    }
-    return head, tree_sha, blobs
+            clean = clean_zip_path(original)
+            if not clean:
+                continue
 
+            if info.file_size > MAX_FILE_SIZE:
+                raise ValueError(
+                    f"{clean} file 5 MB se badi hai."
+                )
 
-def detect_mode(command, selected):
-    c = command.lower()
-    if selected in ("delete", "upload", "replace"):
-        return selected
+            total_size += info.file_size
+            if total_size > MAX_TOTAL_SIZE:
+                raise ValueError("ZIP ka unpacked size 50 MB se zyada hai.")
 
-    wants_upload = any(x in c for x in (
-        "upload", "zip", "अपलोड", "चढ़ा", "लगाओ", "लगानी"
-    ))
-    wants_delete = any(x in c for x in (
-        "delete", "remove", "हटा", "डिलीट", "मिटा"
-    ))
-    if wants_delete and wants_upload:
-        return "replace"
-    if wants_delete:
-        return "delete"
-    if wants_upload:
-        return "upload"
-    raise ValueError("Command se action samajh nahi aaya. Mode select karo.")
+            if clean in files:
+                raise ValueError(
+                    f"ZIP mein duplicate normalized path mila: {clean}"
+                )
+
+            files[clean] = archive.read(info)
+
+    if not files:
+        raise ValueError(
+            "ZIP mein upload karne layak files nahi mili."
+        )
+
+    return files, warnings
 
 
-def make_preview(api, owner, repo, branch, mode, mapped):
-    head, tree_sha, old = get_head_tree(api, branch)
-    incoming = mapped or {}
-    new_paths = set(incoming)
-    old_paths = set(old)
+def match_source(target, zip_files):
+    """
+    Pehle exact path, phir extra root-folder ke saath suffix match,
+    aur aakhir mein unique basename match.
+    """
+    target = target.strip("/")
 
-    added = sorted(new_paths - old_paths)
-    updated = sorted(new_paths & old_paths)
-    deleted = sorted(old_paths) if mode == "delete" else (
-        sorted(old_paths - new_paths) if mode == "replace" else []
+    if target in zip_files:
+        return target
+
+    suffix_matches = [
+        name for name in zip_files
+        if name.endswith("/" + target)
+    ]
+
+    if len(suffix_matches) == 1:
+        return suffix_matches[0]
+
+    if len(suffix_matches) > 1:
+        raise ValueError(
+            f"{target}: ZIP mein multiple suffix matches hain: "
+            + ", ".join(suffix_matches[:8])
+        )
+
+    basename = target.split("/")[-1]
+    basename_matches = [
+        name for name in zip_files
+        if name.split("/")[-1] == basename
+    ]
+
+    if len(basename_matches) == 1:
+        return basename_matches[0]
+
+    if len(basename_matches) > 1:
+        raise ValueError(
+            f"{target}: basename '{basename}' multiple folders mein hai. "
+            "ZIP structure aur mapping ko clear karo."
+        )
+
+    raise ValueError(
+        f"Mapping wali file ZIP mein nahi mili: {target}"
     )
 
-    # Avoid showing an action that doesn't change anything.
-    if mode == "delete" and not deleted:
-        note = "Repository mein delete karne layak tracked files nahi mili."
+
+def get_branch_tree(owner, repo, branch):
+    ref = github_request(
+        "GET",
+        f"/repos/{owner}/{repo}/git/ref/heads/{branch}"
+    )
+
+    commit_sha = ref["object"]["sha"]
+
+    commit = github_request(
+        "GET",
+        f"/repos/{owner}/{repo}/git/commits/{commit_sha}"
+    )
+
+    tree_sha = commit["tree"]["sha"]
+
+    tree = github_request(
+        "GET",
+        f"/repos/{owner}/{repo}/git/trees/{tree_sha}",
+        params={"recursive": "1"}
+    )
+
+    if tree.get("truncated"):
+        raise ValueError(
+            "GitHub tree bahut bada hai aur response truncated hai. "
+            "Is repository par safe replacement nahi kiya ja sakta."
+        )
+
+    tracked = {}
+
+    for item in tree.get("tree", []):
+        if item.get("type") == "blob":
+            tracked[item["path"]] = item.get("sha")
+
+    return commit_sha, tree_sha, tracked
+
+
+def make_preview(repo_value, mode, raw_map, zip_bytes):
+    owner, repo, repo_data = get_owned_repo(repo_value)
+    targets = parse_mapping(raw_map)
+    zip_files, warnings = read_zip(zip_bytes)
+
+    uploads = {}
+
+    for target in targets:
+        source = match_source(target, zip_files)
+        uploads[target] = zip_files[source]
+
+    branch = repo_data.get("default_branch")
+    if not branch:
+        raise ValueError("Repository mein default branch nahi mili.")
+
+    commit_sha, tree_sha, tracked = get_branch_tree(
+        owner, repo, branch
+    )
+
+    if mode == "replace":
+        deletes = sorted(set(tracked.keys()) - set(uploads.keys()))
+    elif mode == "upload":
+        deletes = []
     else:
-        note = "Review the exact file list before confirming."
+        raise ValueError("Unknown action mode.")
+
+    # Preview stores only mapped bytes, not the full ZIP.
+    preview_id = uuid.uuid4().hex
+
+    PREVIEWS[preview_id] = {
+        "owner": owner,
+        "repo": repo,
+        "branch": branch,
+        "base_commit": commit_sha,
+        "base_tree": tree_sha,
+        "uploads": uploads,
+        "deletes": deletes,
+        "mode": mode
+    }
 
     return {
-        "api": api, "owner": owner, "repo": repo, "branch": branch,
-        "mode": mode, "head": head, "tree_sha": tree_sha, "old": old,
-        "files": incoming, "added": added, "updated": updated,
-        "deleted": deleted, "note": note
+        "token": preview_id,
+        "uploads": sorted(uploads.keys()),
+        "deletes": deletes,
+        "warnings": warnings,
+        "message": (
+            f"Repository: {owner}/{repo} | Branch: {branch} | "
+            f"Mode: {mode.upper()}"
+        )
     }
 
 
-def commit_plan(plan, message):
-    api = plan["api"]
-    branch = plan["branch"]
+def apply_preview(preview_id):
+    data = PREVIEWS.get(preview_id)
 
-    # Don't commit if another change happened after preview.
-    current, _, _ = get_head_tree(api, branch)
-    if current != plan["head"]:
-        raise ValueError("Preview ke baad repo badli. Dobara Preview banao.")
+    if not data:
+        raise ValueError(
+            "Preview expire ya unavailable hai. ZIP dobara preview karo."
+        )
 
-    entries = []
-    for path, data in plan["files"].items():
-        blob = gh("POST", api, "/git/blobs", json={
-            "content": base64.b64encode(data).decode("ascii"),
-            "encoding": "base64"
+    owner = data["owner"]
+    repo = data["repo"]
+    branch = data["branch"]
+
+    # Abort if another commit changed the branch after preview.
+    current_ref = github_request(
+        "GET",
+        f"/repos/{owner}/{repo}/git/ref/heads/{branch}"
+    )
+
+    current_sha = current_ref["object"]["sha"]
+
+    if current_sha != data["base_commit"]:
+        raise ValueError(
+            "Preview ke baad repository badal gayi hai. "
+            "Latest ZIP ka dobara preview banao."
+        )
+
+    tree_entries = []
+
+    # Delete only files listed in the reviewed preview.
+    for path in data["deletes"]:
+        tree_entries.append({
+            "path": path,
+            "mode": "100644",
+            "type": "blob",
+            "sha": None
         })
-        entries.append({
-            "path": path, "mode": "100644",
-            "type": "blob", "sha": blob["sha"]
+
+    # Upload new blob objects.
+    for path, content in data["uploads"].items():
+        blob = github_request(
+            "POST",
+            f"/repos/{owner}/{repo}/git/blobs",
+            json={
+                "content": base64.b64encode(content).decode("ascii"),
+                "encoding": "base64"
+            }
+        )
+
+        tree_entries.append({
+            "path": path,
+            "mode": "100644",
+            "type": "blob",
+            "sha": blob["sha"]
         })
 
-    for path in plan["deleted"]:
-        entries.append({
-            "path": path, "mode": "100644",
-            "type": "blob", "sha": None
-        })
+    new_tree = github_request(
+        "POST",
+        f"/repos/{owner}/{repo}/git/trees",
+        json={
+            "base_tree": data["base_tree"],
+            "tree": tree_entries
+        }
+    )
 
-    if not entries:
-        raise ValueError("Koi change nahi hai.")
+    commit = github_request(
+        "POST",
+        f"/repos/{owner}/{repo}/git/commits",
+        json={
+            "message": (
+                "GitHub Worker: "
+                + ("replace mapped files" if data["mode"] == "replace"
+                   else "upload mapped files")
+            ),
+            "tree": new_tree["sha"],
+            "parents": [data["base_commit"]]
+        }
+    )
 
-    tree = gh("POST", api, "/git/trees", json={
-        "base_tree": plan["tree_sha"], "tree": entries
-    })
-    commit = gh("POST", api, "/git/commits", json={
-        "message": (message or "Update via GitHub Worker")[:150],
-        "tree": tree["sha"], "parents": [plan["head"]]
-    })
+    # Update branch only if it still points to the previewed commit.
+    latest = github_request(
+        "GET",
+        f"/repos/{owner}/{repo}/git/ref/heads/{branch}"
+    )
 
-    # force=False protects against overwriting a newer branch.
-    gh("PATCH", api, f"/git/refs/heads/{branch}", json={
-        "sha": commit["sha"], "force": False
-    })
-    return commit["sha"]
+    if latest["object"]["sha"] != data["base_commit"]:
+        raise ValueError(
+            "Apply ke dauran branch badal gayi. Commit bana hai, "
+            "lekin branch update nahi ki gayi. Repo check karo."
+        )
 
+    github_request(
+        "PATCH",
+        f"/repos/{owner}/{repo}/git/refs/heads/{branch}",
+        json={"sha": commit["sha"], "force": False}
+    )
 
-PAGE = r"""
-<!doctype html><html lang="hi"><head>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GitHub Worker</title>
-<style>
-*{box-sizing:border-box}body{margin:0;background:#080d18;color:#f1f5ff;
-font:15px system-ui;padding:16px}main{max-width:780px;margin:auto}
-h1{margin-bottom:5px}.muted,small{color:#aab8d0}
-.card{background:#111a2b;border:1px solid #293a55;border-radius:15px;
-padding:16px;margin:14px 0}
-label{display:block;font-weight:700;margin:13px 0 6px}
-input,textarea,select,button{width:100%;padding:12px;border-radius:10px;
-font:inherit}input,textarea,select{background:#080f1e;color:#fff;
-border:1px solid #354761}textarea{min-height:150px}
-button{margin-top:12px;background:#7d9aff;color:#071024;border:0;
-font-weight:800}button.danger{background:#ffbd70}
-pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#080f1e;
-padding:12px;border-radius:10px;max-height:360px;overflow:auto}
-</style></head><body><main>
-<h1>⚡ GitHub Worker</h1>
-<div class="muted">Server-side file manager · ZIP map · One commit</div>
-<div class="card">
-<label>Admin password</label><input id="pw" type="password">
-<label>Apni GitHub repository ka link</label>
-<input id="repo" placeholder="https://github.com/USERNAME/REPOSITORY">
-<label>Command</label>
-<textarea id="cmd">Purani files delete karke ZIP wali files map ke mutabik upload karo.</textarea>
-<label>Action</label>
-<select id="mode">
-<option value="auto">Command se khud samjho</option>
-<option value="delete">Sirf purani files DELETE karo</option>
-<option value="upload">Sirf files UPLOAD/UPDATE karo; baaki rakho</option>
-<option value="replace">Purani files DELETE + mapped files UPLOAD</option>
-</select>
-<label>ZIP ya ek file</label><input id="file" type="file" accept=".zip,*/*">
-<label>File map (upload/replace ke liye)</label>
-<textarea id="map">ROOT:
-- app.py
-- requirements.txt
-- render.yaml
-- README.md
+    PREVIEWS.pop(preview_id, None)
 
-public/:
-- index.html
-- style.css
-- app.js</textarea>
-<label>Commit message</label>
-<input id="msg" value="Update files using GitHub Worker">
-<button onclick="preview()">1. Preview banao</button>
-<pre id="out">Yahan status aur file list dikhegi.</pre>
-<label><input id="confirm" type="checkbox" style="width:auto">
-Maine poora Preview check kar liya hai aur listed changes approve karta hoon.</label>
-<button class="danger" onclick="applyPlan()">2. Confirm karke apply karo</button>
-</div></main>
-<script>
-let previewId="";
-function h(){return {"X-Admin-Password":document.getElementById("pw").value}}
-async function preview(){
- const f=document.getElementById("file").files[0];
- const mode=document.getElementById("mode").value;
- if(mode!=="delete"&&!f){alert("Upload/replace ke liye file ya ZIP select karo.");return}
- const d=new FormData();
- d.append("repo",document.getElementById("repo").value);
- d.append("command",document.getElementById("cmd").value);
- d.append("mode",mode);
- d.append("map",document.getElementById("map").value);
- if(f)d.append("file",f);
- const out=document.getElementById("out");
- out.textContent="Server par preview ban raha hai...";
- document.getElementById("confirm").checked=false;
- try{
-  const r=await fetch("/preview",{method:"POST",headers:h(),body:d});
-  const j=await r.json();previewId=j.preview_id||"";
-  out.textContent=JSON.stringify(j,null,2);
- }catch(e){out.textContent="Network error: "+e}
-}
-async function applyPlan(){
- if(!previewId){alert("Pehle Preview banao.");return}
- if(!document.getElementById("confirm").checked){
-  alert("Pehle confirmation checkbox tick karo.");return}
- if(!confirm("Listed changes ko GitHub par apply karna hai?"))return;
- const out=document.getElementById("out");
- out.textContent="Server par commit ban raha hai...";
- try{
-  const r=await fetch("/apply",{method:"POST",headers:{
-   ...h(),"Content-Type":"application/json"},
-   body:JSON.stringify({preview_id:previewId,
-    message:document.getElementById("msg").value})});
-  const j=await r.json();out.textContent=JSON.stringify(j,null,2);
-  if(r.ok)previewId="";
- }catch(e){out.textContent="Network error: "+e}
-}
-</script></body></html>
-"""
+    return (
+        f"Success! Commit: {commit['sha']} | "
+        f"Uploaded/updated: {len(data['uploads'])} | "
+        f"Deleted: {len(data['deletes'])}"
+    )
 
 
 @app.get("/")
 def home():
-    return render_template_string(PAGE)
+    return render_page()
 
 
 @app.get("/health")
 def health():
-    return {"ok": True, "configured": bool(TOKEN and ADMIN_PASSWORD)}
+    return {
+        "status": "ok",
+        "github_token_configured": bool(GITHUB_TOKEN),
+        "admin_password_configured": bool(ADMIN_PASSWORD)
+    }
 
 
 @app.post("/preview")
 def preview():
-    if not authorized():
-        return jsonify(error="Password incorrect or not configured."), 401
+    password = request.form.get("password", "")
+    repo = request.form.get("repo", "")
+    mode = request.form.get("mode", "replace")
+    raw_map = request.form.get("file_map", "")
+
     try:
-        api, owner, repo, branch = repo_details(request.form.get("repo", ""))
-        command = request.form.get("command", "")
-        mode = detect_mode(command, request.form.get("mode", "auto"))
+        check_password(password)
 
-        mapped = {}
-        if mode != "delete":
-            raw = read_upload(request.files.get("file"))
-            mapping = parse_map(request.form.get("map", ""))
-            mapped = map_files(raw, mapping)
+        upload = request.files.get("zip_file")
+        if not upload or not upload.filename:
+            raise ValueError("ZIP file select karo.")
 
-        plan = make_preview(api, owner, repo, branch, mode, mapped)
-        pid = secrets.token_urlsafe(32)
-        PREVIEWS[pid] = {"plan": plan, "created": time.time()}
+        if not upload.filename.lower().endswith(".zip"):
+            raise ValueError("Sirf .zip file upload karo.")
 
-        return jsonify({
-            "preview_id": pid,
-            "repository": f"{owner}/{repo}",
-            "branch": branch,
-            "mode": mode.upper(),
-            "new_files": len(plan["added"]),
-            "updated_files": len(plan["updated"]),
-            "deleted_files": len(plan["deleted"]),
-            "added": plan["added"],
-            "updated": plan["updated"],
-            "deleted": plan["deleted"],
-            "note": plan["note"],
-            "message": "Preview ready. Apply karne se pehle list check karo."
-        })
-    except Exception as e:
-        return jsonify(error=str(e)), 400
+        zip_bytes = upload.read(MAX_ZIP_SIZE + 1)
+
+        if len(zip_bytes) > MAX_ZIP_SIZE:
+            raise ValueError("ZIP maximum 25 MB ka ho sakta hai.")
+
+        result = make_preview(repo, mode, raw_map, zip_bytes)
+
+        return render_page(
+            result=result,
+            repo=repo,
+            mode=mode,
+            file_map=raw_map,
+            password=password
+        )
+
+    except Exception as exc:
+        return render_page(
+            error=str(exc),
+            repo=repo,
+            mode=mode,
+            file_map=raw_map,
+            password=password
+        ), 400
 
 
 @app.post("/apply")
 def apply():
-    if not authorized():
-        return jsonify(error="Unauthorized"), 401
-    data = request.get_json(silent=True) or {}
-    pid = data.get("preview_id", "")
-    saved = PREVIEWS.get(pid)
-    if not saved:
-        return jsonify(error="Preview expired/missing. Dobara Preview banao."), 400
-    if time.time() - saved["created"] > 900:
-        PREVIEWS.pop(pid, None)
-        return jsonify(error="Preview 15 minutes baad expire ho gaya. Dobara banao."), 400
+    password = request.form.get("password", "")
+    preview_id = request.form.get("preview_id", "")
 
     try:
-        plan = saved["plan"]
-        sha = commit_plan(plan, data.get("message", "Update via GitHub Worker"))
-        PREVIEWS.pop(pid, None)
-        return jsonify({
-            "ok": True,
-            "message": "Ho gaya! GitHub par changes commit ho gaye. Check kar lo.",
-            "repository": f"{plan['owner']}/{plan['repo']}",
-            "commit": sha,
-            "commit_url": f"https://github.com/{plan['owner']}/{plan['repo']}/commit/{sha}",
-            "added": plan["added"],
-            "updated": plan["updated"],
-            "deleted": plan["deleted"]
-        })
-    except Exception as e:
-        return jsonify(error=str(e)), 400
+        check_password(password)
+        message = apply_preview(preview_id)
 
+        return render_page(
+            result={
+                "message": message,
+                "uploads": [],
+                "deletes": [],
+                "warnings": [],
+                "token": None
+            }
+        )
 
-@app.errorhandler(413)
-def too_large(_):
-    return jsonify(error="Upload 25 MB se chhota hona chahiye."), 413
+    except Exception as exc:
+        return render_page(error=str(exc)), 400
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
+    port = int(os.environ.get("PORT", "5000"))
+    app.run(host="0.0.0.0", port=port)
