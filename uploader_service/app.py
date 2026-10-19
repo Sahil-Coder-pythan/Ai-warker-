@@ -9,9 +9,9 @@ POST /apply
 - form field `zip` : the zip file (multipart file)
 - form field `mapping` : JSON string describing operations (see example_mapping.json)
 
-The mapping format example (see uploader_service/example_mapping.json):
+The mapping format example:
 {
-  "default_operation": "upload",         # upload files from zip that are not listed in operations
+  "default_operation": "upload",
   "operations": [
     {"action": "upload", "zip_path": "public/app.js", "repo_path": "public/app.js"},
     {"action": "delete", "repo_path": "old/file.txt"}
@@ -24,19 +24,23 @@ This service will:
 - return a JSON report of successes and failures
 """
 
-import os
 import io
 import json
-import base64
+import os
 import zipfile
-from flask import Flask, request, jsonify
-from github_client import GitHubClient
+
+from flask import Flask, jsonify, request
+
+try:
+    from uploader_service.github_client import GitHubClient
+except ImportError:  # pragma: no cover
+    from github_client import GitHubClient
 
 app = Flask(__name__)
 
 TOKEN = os.environ.get("GITHUB_TOKEN")
 REPO = os.environ.get("GITHUB_REPO")
-BRANCH = os.environ.get("GITHUB_BRANCH")  # optional
+BRANCH = os.environ.get("GITHUB_BRANCH")
 
 if not TOKEN or not REPO:
     app.logger.warning("GITHUB_TOKEN or GITHUB_REPO not set. The service will not operate until set.")
@@ -47,85 +51,79 @@ def load_mapping(mapping_field):
         return {"default_operation": "upload", "operations": []}
     try:
         return json.loads(mapping_field)
-    except Exception as e:
-        raise ValueError(f"Invalid mapping JSON: {e}")
+    except Exception as exc:
+        raise ValueError(f"Invalid mapping JSON: {exc}")
 
 
-@app.route("/apply", methods=["POST"])    
+@app.route("/apply", methods=["POST"])
 def apply_mapping():
     if not TOKEN or not REPO:
         return jsonify({"error": "GITHUB_TOKEN and GITHUB_REPO must be set in environment"}), 400
 
-    if 'zip' not in request.files:
+    if "zip" not in request.files:
         return jsonify({"error": "Missing 'zip' file in form-data"}), 400
 
-    zip_file = request.files['zip']
-    mapping = load_mapping(request.form.get('mapping'))
+    zip_file = request.files["zip"]
+    mapping = load_mapping(request.form.get("mapping"))
 
     try:
-        z = zipfile.ZipFile(io.BytesIO(zip_file.read()))
-    except Exception as e:
-        return jsonify({"error": f"Failed to read zip: {e}"}), 400
+        zipped = zipfile.ZipFile(io.BytesIO(zip_file.read()))
+    except Exception as exc:
+        return jsonify({"error": f"Failed to read zip: {exc}"}), 400
 
     gh = GitHubClient(token=TOKEN, repo=REPO, branch=BRANCH)
-
-    ops = mapping.get('operations', [])
-    default_op = mapping.get('default_operation', 'upload')
-
-    # Build quick map for ops by zip_path or repo_path
-    ops_by_zip = {op.get('zip_path'): op for op in ops if 'zip_path' in op}
-    ops_by_repo = {op.get('repo_path'): op for op in ops if 'repo_path' in op}
+    ops = mapping.get("operations", [])
+    default_op = mapping.get("default_operation", "upload")
+    ops_by_zip = {op.get("zip_path"): op for op in ops if "zip_path" in op}
+    ops_by_repo = {op.get("repo_path"): op for op in ops if "repo_path" in op}
 
     report = {"performed": [], "errors": []}
 
-    # First apply explicit ops in mapping
     for op in ops:
-        action = op.get('action')
-        repo_path = op.get('repo_path')
-        zip_path = op.get('zip_path')
+        action = op.get("action")
+        repo_path = op.get("repo_path")
+        zip_path = op.get("zip_path")
         try:
-            if action in ('upload', 'update'):
+            if action in ("upload", "update"):
                 if not zip_path:
                     raise ValueError("upload/update op requires zip_path")
                 try:
-                    data = z.read(zip_path)
-                except KeyError:
-                    raise FileNotFoundError(f"zip does not contain {zip_path}")
-                gh.create_or_update_file(repo_path, data, message=op.get('message') or f"Upload {repo_path}")
-                report['performed'].append({"action": action, "repo_path": repo_path})
-
-            elif action == 'delete':
-                gh.delete_file(repo_path, message=op.get('message') or f"Delete {repo_path}")
-                report['performed'].append({"action": action, "repo_path": repo_path})
-
+                    payload = zipped.read(zip_path)
+                except KeyError as exc:
+                    raise FileNotFoundError(f"zip does not contain {zip_path}") from exc
+                gh.create_or_update_file(
+                    repo_path,
+                    payload,
+                    message=op.get("message") or f"Upload {repo_path}",
+                )
+                report["performed"].append({"action": action, "repo_path": repo_path})
+            elif action == "delete":
+                gh.delete_file(repo_path, message=op.get("message") or f"Delete {repo_path}")
+                report["performed"].append({"action": action, "repo_path": repo_path})
             else:
                 raise ValueError(f"Unknown action: {action}")
-        except Exception as e:
-            report['errors'].append({"op": op, "error": str(e)})
+        except Exception as exc:
+            report["errors"].append({"op": op, "error": str(exc)})
 
-    # Then walk zip and apply default operation for files not referenced explicitly
-    for info in z.infolist():
+    for info in zipped.infolist():
         if info.is_dir():
             continue
         zip_path = info.filename
-        # skip files referenced already
         if zip_path in ops_by_zip:
             continue
-        repo_path = zip_path  # default: use same path in repo
-        op = ops_by_repo.get(repo_path)
-        if op:
+        repo_path = zip_path
+        if ops_by_repo.get(repo_path):
             continue
-        if default_op == 'upload':
+        if default_op == "upload":
             try:
-                data = z.read(zip_path)
+                data = zipped.read(zip_path)
                 gh.create_or_update_file(repo_path, data, message=f"Upload {repo_path}")
-                report['performed'].append({"action": "upload", "repo_path": repo_path})
-            except Exception as e:
-                report['errors'].append({"zip_path": zip_path, "error": str(e)})
-        # you can add other default actions like skip or delete
+                report["performed"].append({"action": "upload", "repo_path": repo_path})
+            except Exception as exc:
+                report["errors"].append({"zip_path": zip_path, "error": str(exc)})
 
     return jsonify(report)
 
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
