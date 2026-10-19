@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#0f172a">
+  <title>AI Worker — GitHub File Agent</title>
+  <link rel="stylesheet" href="/public/style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="logo">⚡ AI Worker</div>
+      <div id="userBadge" class="user-badge hidden"></div>
+    </header>
+
+    <!-- Step 1: Token -->
+    <section id="stepToken" class="card">
+      <h1>GitHub Token लगाओ</h1>
+      <p class="sub">Classic Personal Access Token (repo scope). Token सिर्फ इस डिवाइस पर रहता है — दूसरे यूज़र को कभी नहीं दिखेगा।</p>
+      <label>GitHub Token</label>
+      <input type="password" id="tokenInput" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off">
+      <button class="btn primary" id="verifyBtn">Verify & Continue</button>
+      <div id="tokenStatus" class="status"></div>
+      <details class="help">
+        <summary>Token कैसे बनाएँ?</summary>
+        <ol>
+          <li>GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)</li>
+          <li>Generate new token (classic)</li>
+          <li>Scopes: <strong>repo</strong> (full control) चुनो</li>
+          <li>Generate → कॉपी करके यहाँ paste करो</li>
+        </ol>
+      </details>
+    </section>
+
+    <!-- Step 2: Dashboard -->
+    <section id="stepDash" class="hidden">
+      <div class="card">
+        <h2>Repo चुनो</h2>
+        <label>owner/repo</label>
+        <input type="text" id="repoInput" placeholder="Sahil-Coder-pythan/ai-builder">
+        <div id="repoList" class="repo-list"></div>
+      </div>
+
+      <div class="card">
+        <h2>1️⃣ सारी फाइलें Delete</h2>
+        <p class="sub">Repo की सारी फाइलें एक commit में wipe हो जाएँगी (force)।</p>
+        <button class="btn danger" id="wipeBtn">Wipe All Files</button>
+        <div id="wipeStatus" class="status"></div>
+      </div>
+
+      <div class="card">
+        <h2>2️⃣ ZIP Upload (नक्शे के हिसाब से)</h2>
+        <p class="sub">ZIP चुनो + optional नक्शा (JSON)। नक्शा खाली छोड़ोगे तो ZIP का अपना structure लगेगा।</p>
+
+        <label>ZIP फाइल</label>
+        <input type="file" id="zipFile" accept=".zip,application/zip">
+
+        <label>नक्शा (Map JSON) — optional</label>
+        <textarea id="mapInput" rows="8" placeholder='{
+  "app.py": "app.py",
+  "requirements.txt": "requirements.txt",
+  "render.yaml": "render.yaml",
+  "README.md": "README.md",
+  "public/index.html": "public/index.html",
+  "public/chat.html": "public/chat.html",
+  "public/app.js": "public/app.js",
+  "public/style.css": "public/style.css"
+}'></textarea>
+
+        <label>Commit message (optional)</label>
+        <input type="text" id="commitMsg" placeholder="AI Worker: deploy new version">
+
+        <div class="btn-row">
+          <button class="btn secondary" id="uploadOnlyBtn">सिर्फ Upload</button>
+          <button class="btn primary" id="wipeUploadBtn">Wipe + Upload (एक साथ)</button>
+        </div>
+        <div id="uploadStatus" class="status"></div>
+      </div>
+
+      <div class="card muted">
+        <button class="btn ghost" id="logoutBtn">Token हटाओ / Logout</button>
+        <p class="tiny">यह टूल बैकग्राउंड में GitHub API से काम करता है। Browser/mobile window नहीं खुलता। एक लिंक कई लोग चलाएँ तो भी एक-दूसरे की token/files कभी नहीं दिखतीं।</p>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <script src="/public/app.js"></script>
+</body>
+</html>
