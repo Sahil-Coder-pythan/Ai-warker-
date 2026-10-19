@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>AI Worker</title>
+  <link rel="stylesheet" href="/public/style.css" />
+</head>
+<body>
+  <div id="setup" class="screen">
+    <div class="setup-card">
+      <div class="logo">AI Worker</div>
+      <p class="sub">GitHub Personal Access Token लगाओ। Connect के बाद chat खुलेगा।</p>
+      <label>GITHUB TOKEN</label>
+      <input id="tokenInput" type="password" placeholder="ghp_… या github_pat_…" autocomplete="off" />
+      <button id="verifyBtn" class="btn primary">Connect</button>
+      <p id="setupErr" class="err"></p>
+      <p class="hint">Token सिर्फ इस फ़ोन पर सेव होता है। Render पर <code>GROQ_API_KEY</code> डालो तो सवाल भी पूछ सकते हो।</p>
+    </div>
+  </div>
+
+  <div id="main" class="screen hidden">
+    <header class="top">
+      <div class="brand">
+        <span class="dot"></span>
+        <div>
+          <strong>AI Worker</strong>
+          <small id="userLabel">—</small>
+        </div>
+      </div>
+      <select id="repoSelect" class="repo-select" title="Repo चुनो">
+        <option value="">Repo चुनो…</option>
+      </select>
+    </header>
+
+    <main id="chat" class="chat"></main>
+
+    <div id="actionPanel" class="action-panel hidden">
+      <div class="ap-row">
+        <label>नक्शा (Map JSON) — खाली = ZIP structure</label>
+        <textarea id="mapInput" rows="3" placeholder='{"app.py":"app.py","public/index.html":"public/index.html"}'></textarea>
+      </div>
+      <div class="ap-row">
+        <label>ZIP फाइल</label>
+        <input id="zipInput" type="file" accept=".zip,application/zip" />
+      </div>
+      <div class="ap-actions">
+        <button type="button" id="btnWipe" class="btn danger">सिर्फ Delete</button>
+        <button type="button" id="btnUpload" class="btn primary">Upload</button>
+        <button type="button" id="btnWipeUpload" class="btn accent">Delete + Upload</button>
+        <button type="button" id="btnClosePanel" class="btn ghost">बंद</button>
+      </div>
+    </div>
+
+    <footer class="composer">
+      <button type="button" id="toolsBtn" class="icon-btn" title="File tools">⚙</button>
+      <textarea id="msgInput" rows="1" placeholder="लिखो… delete / upload / कोई सवाल"></textarea>
+      <button type="button" id="sendBtn" class="send-btn">➤</button>
+    </footer>
+  </div>
+
+  <script src="/public/app.js"></script>
+</body>
+</html>
