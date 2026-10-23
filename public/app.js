@@ -31,18 +31,6 @@ function escapeHtml(s) {
     .replace(/>/g, "&gt;");
 }
 
-async function readApiResponse(res) {
-  const raw = await res.text();
-  let data;
-  try { data = raw ? JSON.parse(raw) : {}; }
-  catch (_) {
-    const preview = raw.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 220);
-    throw new Error(`Server ने JSON के बजाय HTML/text भेजा (HTTP ${res.status}). ${preview || "Render Logs देखें।"}`);
-  }
-  if (!res.ok) throw new Error(data.error || data.message || `Request failed (HTTP ${res.status})`);
-  return data;
-}
-
 function fillRepos(repos) {
   const sel = $("#repoSelect");
   sel.innerHTML = '<option value="">Repo चुनो…</option>';
@@ -113,7 +101,8 @@ async function doWipe() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token: state.token, repo }),
     });
-    const data = await readApiResponse(res);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Wipe fail");
     m.classList.remove("working");
     m.innerHTML =
       '<span class="tag">AI Worker</span>\n' +
@@ -167,7 +156,11 @@ async function doUpload(doWipeFirst) {
   state.busy = true;
   const label = doWipeFirst ? "Delete + Upload" : "Upload";
   const endpoint = doWipeFirst ? "/api/wipe-and-upload" : "/api/upload";
-  const m = addMsg("bot", label + " शुरू… " + repo, "working");
+  const m = addMsg(
+    "bot",
+    label + " शुरू… " + repo + "\n" + file.name + " (" + Math.round(file.size / 1024) + " KB)\nबड़ी ZIP हो तो 1–3 मिनट लग सकते हैं — रुकना।",
+    "working"
+  );
   try {
     const fd = new FormData();
     fd.append("token", state.token);
@@ -175,11 +168,24 @@ async function doUpload(doWipeFirst) {
     fd.append("map", mapJson);
     fd.append("file", file);
     const res = await fetch(endpoint, { method: "POST", body: fd });
-    const data = await readApiResponse(res);
+    const raw = await res.text();
+    let data = null;
+    try {
+      data = JSON.parse(raw);
+    } catch (_) {
+      // Server returned HTML (timeout / proxy error) instead of JSON
+      const snippet = (raw || "").replace(/\s+/g, " ").slice(0, 120);
+      throw new Error(
+        "Server HTML error (timeout/size)। ZIP बहुत बड़ी या Render timeout।\n" +
+          "थोड़ी देर बाद फिर try करो। Detail: " +
+          snippet
+      );
+    }
+    if (!res.ok) throw new Error((data && data.error) || "Upload fail " + res.status);
     m.classList.remove("working");
     m.innerHTML =
       '<span class="tag">AI Worker</span>\n' +
-      escapeHtml(data.message || "काम पूरा। GitHub पर check कर लो।");
+      escapeHtml((data && data.message) || "काम पूरा। GitHub पर check कर लो।");
   } catch (e) {
     m.classList.remove("working");
     m.innerHTML =
@@ -361,7 +367,8 @@ $("#verifyBtn").onclick = async () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token: t }),
     });
-    const data = await readApiResponse(res);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Verify fail");
     state.token = t;
     localStorage.setItem(TOKEN_KEY, t);
     await enterMain(data);

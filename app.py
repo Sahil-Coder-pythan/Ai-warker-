@@ -10,8 +10,8 @@ import hashlib
 import secrets
 import zipfile
 import tempfile
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 from flask import Flask, request, jsonify, send_from_directory, send_file
@@ -22,17 +22,17 @@ PUBLIC_DIR = os.path.join(BASE_DIR, "public")
 
 app = Flask(__name__, static_folder=PUBLIC_DIR, static_url_path="/public")
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", secrets.token_hex(32))
-app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024  # 100 MB ZIP max; keep aligned with hosting limits
-MAX_UPLOAD_FILES = 400
-MAX_UNCOMPRESSED_BYTES = 250 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 120 * 1024 * 1024  # 120 MB ZIP — 500+ files
 
 GITHUB_API = "https://api.github.com"
-TIMEOUT = 45
+TIMEOUT = 90  # large uploads need more time
+BLOB_WORKERS = 12  # parallel GitHub blob creates
 
 
 @app.errorhandler(413)
-def too_large(_error):
-    return jsonify(error="ZIP 100 MB से बड़ी है। छोटी ZIP या कई हिस्सों में अपलोड करें।"), 413
+def too_large(_e):
+    return jsonify(error="ZIP बहुत बड़ी है (max ~120MB)। छोटे हिस्से में upload करो।"), 413
+
 
 
 def get_fernet():
@@ -326,83 +326,71 @@ def apply_map(file_map: dict, zip_namelist: list) -> dict:
     return result
 
 
-def inspect_zip(zip_bytes: bytes, file_map: dict):
-    """Validate ZIP before any destructive repository operation."""
-    try:
-        zf = zipfile.ZipFile(io.BytesIO(zip_bytes))
-        bad_member = zf.testzip()
-        if bad_member:
-            return None, None, f"ZIP के अंदर खराब फाइल है: {bad_member}"
-        infos = [i for i in zf.infolist() if not i.is_dir()]
-        names = [i.filename for i in infos]
-        mapping = apply_map(file_map or {}, names)
-        if not mapping:
-            return None, None, "ZIP में कोई usable फाइल नहीं मिली।"
-        if len(mapping) > MAX_UPLOAD_FILES:
-            return None, None, f"एक बार में अधिकतम {MAX_UPLOAD_FILES} फाइलें अपलोड हो सकती हैं; ZIP में {len(mapping)} mapped files हैं।"
-        if sum(i.file_size for i in infos) > MAX_UNCOMPRESSED_BYTES:
-            return None, None, "ZIP extract होने पर 250 MB से बड़ी है। ZIP को छोटे हिस्सों में बाँटें।"
-        # Reject unsafe or duplicate destination paths.
-        cleaned = {}
-        for target, source in mapping.items():
-            target = str(target).replace("\\", "/").strip("/")
-            parts = target.split("/")
-            if not target or any(part in ("", ".", "..") for part in parts):
-                return None, None, f"गलत repository path: {target}"
-            if target in cleaned:
-                return None, None, f"Duplicate destination path: {target}"
-            cleaned[target] = source
-        return zf, cleaned, None
-    except zipfile.BadZipFile:
-        return None, None, "ZIP फाइल खराब है।"
-    except Exception as exc:
-        return None, None, f"ZIP जाँच नहीं हो सकी: {str(exc)[:180]}"
-
-
 def upload_zip(token, owner, repo, zip_bytes: bytes, file_map: dict, commit_message: str):
-    """Upload up to 400 files using bounded parallel Git blob requests, then one atomic tree/commit."""
-    zf, mapping, validation_error = inspect_zip(zip_bytes, file_map)
-    if validation_error:
-        return False, validation_error
-
     branch, r = get_default_branch(token, owner, repo)
     if not branch:
         return False, f"Repo access fail: {r.status_code} {r.text[:200]}"
-    parent_sha, r = get_ref_sha(token, owner, repo, branch)
-    if not parent_sha:
-        return False, f"Branch ref नहीं पढ़ पाया: {r.status_code} {r.text[:200]}"
 
-    def make_blob(item):
-        target_path, zip_path = item
+    parent_sha, _ = get_ref_sha(token, owner, repo, branch)
+
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(zip_bytes))
+    except zipfile.BadZipFile:
+        return False, "ZIP फाइल खराब है।"
+
+    namelist = zf.namelist()
+    mapping = apply_map(file_map or {}, namelist)
+    if not mapping:
+        return False, "ZIP में कोई usable फाइल नहीं मिली।"
+
+    # Read all file bytes first (in-memory), then parallel blob create
+    jobs = []  # (target_path, data)
+    errors = []
+    for target_path, zip_path in mapping.items():
         try:
             data = zf.read(zip_path)
-            if len(data) > 100 * 1024 * 1024:
-                return target_path, None, "फाइल 100 MB से बड़ी है"
-            blob_sha, response = create_blob(token, owner, repo, data)
-            if not blob_sha:
-                detail = response.text[:180] if response is not None else "GitHub response missing"
-                return target_path, None, f"GitHub {response.status_code if response is not None else '?'}: {detail}"
-            return target_path, blob_sha, None
-        except Exception as exc:
-            return target_path, None, str(exc)[:180]
+        except KeyError:
+            errors.append(f"ZIP में नहीं: {zip_path}")
+            continue
+        jobs.append((target_path, data))
 
-    tree_items, errors = [], []
-    # Parallel requests speed up large ZIPs while avoiding an unbounded API burst.
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        futures = [pool.submit(make_blob, item) for item in mapping.items()]
-        for future in as_completed(futures):
-            target_path, blob_sha, error = future.result()
-            if error:
-                errors.append(f"{target_path}: {error}")
+    if not jobs:
+        return False, "कोई फाइल upload नहीं हो सकी। " + "; ".join(errors[:5])
+
+    tree_items = []
+    n = len(jobs)
+
+    def _one_blob(item):
+        target_path, data = item
+        sha, r = create_blob(token, owner, repo, data)
+        return target_path, sha, r
+
+    workers = min(BLOB_WORKERS, max(1, n))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futs = [pool.submit(_one_blob, j) for j in jobs]
+        for fut in as_completed(futs):
+            try:
+                target_path, blob_sha, r = fut.result()
+            except Exception as e:
+                errors.append(f"Blob exception: {e}")
                 continue
-            tree_items.append({"path": target_path, "mode": "100644", "type": "blob", "sha": blob_sha})
+            if not blob_sha:
+                code = getattr(r, "status_code", "?")
+                errors.append(f"Blob fail {target_path}: {code}")
+                continue
+            tree_items.append(
+                {
+                    "path": target_path,
+                    "mode": "100644",
+                    "type": "blob",
+                    "sha": blob_sha,
+                }
+            )
 
-    if errors:
-        # Do not publish a partial tree. Repo remains unchanged until the final ref update.
-        return False, f"{len(errors)} फाइलों के blob नहीं बने; Repository publish नहीं की गई। उदाहरण: " + "; ".join(errors[:4])
-    if len(tree_items) != len(mapping):
-        return False, f"सभी फाइलें तैयार नहीं हुईं ({len(tree_items)}/{len(mapping)}); Repository publish नहीं की गई।"
+    if not tree_items:
+        return False, "कोई फाइल upload नहीं हो सकी। " + "; ".join(errors[:5])
 
+    # GitHub tree can hold hundreds of entries; one shot for 500–600 files
     tree_sha, r = create_tree(token, owner, repo, tree_items)
     if not tree_sha:
         return False, f"Tree fail: {r.status_code} {r.text[:250]}"
@@ -416,7 +404,8 @@ def upload_zip(token, owner, repo, zip_bytes: bytes, file_map: dict, commit_mess
     if r.status_code not in (200, 201):
         return False, f"Branch update fail: {r.status_code} {r.text[:250]}"
 
-    return True, f"{len(tree_items)} फाइलें सफलतापूर्वक upload हुईं। Branch: {branch}। एक commit में publish किया गया।"
+    extra = f" | skipped: {len(errors)}" if errors else ""
+    return True, f"{len(tree_items)}/{n} फाइलें upload हो गईं। Branch: {branch}{extra}"
 
 
 # ---------- Routes ----------
@@ -544,14 +533,15 @@ def api_wipe_and_upload():
     except json.JSONDecodeError:
         return jsonify(error="Map JSON सही नहीं है"), 400
 
-    # upload_zip creates a complete replacement tree and updates the branch only
-    # after every file is ready. This is safer than wiping the repo first.
-    if len(zip_bytes) < 50:
-        return jsonify(error="ZIP फाइल खाली या अधूरी है"), 400
-    ok, msg = upload_zip(token, owner, repo, zip_bytes, file_map, message)
-    if not ok:
-        return jsonify(error=msg), 400
-    return jsonify(message=f"Delete + Upload पूरा ✅ → {msg}")
+    ok1, msg1 = wipe_repo(token, owner, repo)
+    if not ok1:
+        return jsonify(error="Wipe fail: " + msg1), 400
+
+    ok2, msg2 = upload_zip(token, owner, repo, zip_bytes, file_map, message)
+    if not ok2:
+        return jsonify(error="Upload fail (wipe हो चुका): " + msg2), 400
+
+    return jsonify(message=f"Wipe ✅ → {msg2}")
 
 
 
