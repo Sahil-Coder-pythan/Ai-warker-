@@ -1,0 +1,12 @@
+AI WORKER LUXURY ADD-ON (original app.py, public/app.js, public/index.html and public/style.css are unchanged)
+
+1. Upload auth_app.py and public/luxury.css into the same GitHub repository, preserving the public/ folder.
+2. In Render → your service → Settings → Build & Deploy, set Start Command to:
+   gunicorn auth_app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 300
+3. In Render → Environment add:
+   ADMIN_PASSWORD = your own strong admin password
+   GITHUB_TOKEN = your GitHub Personal Access Token (fine-grained token with only required repo access)
+   FLASK_SECRET_KEY = a long random secret (if already set, keep it)
+4. Save changes and redeploy. Open the Render URL; the app will stay locked until the admin password is entered.
+
+Important: Do not put these secrets in GitHub or in the browser. GitHub token injection is enabled when GITHUB_TOKEN is configured. Render /health is left public for health checks; app pages, assets, and API routes are gated. The gateway uses a signed HttpOnly cookie that expires after 12 hours. Keep the original files unchanged.
