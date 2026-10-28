@@ -187,7 +187,7 @@ async function doUpload(doWipeFirst) {
         escapeHtml((data && data.message) || "काम पूरा।");
       return;
     }
-    // Poll job status until done/error (up to ~15 min)
+    // Poll job status until done/error (up to \~15 min)
     let tries = 0;
     const maxTries = 180;
     while (tries < maxTries) {
@@ -288,7 +288,6 @@ async function handleSend() {
   }
 }
 
-
 async function doReceiveZip() {
   const repo = selectedRepo();
   if (!repo) {
@@ -379,16 +378,17 @@ async function enterMain(data) {
 }
 
 $("#verifyBtn").onclick = async () => {
-  const t = $("#tokenInput").value.trim();
+  let t = $("#tokenInput").value.trim();
   $("#setupErr").textContent = "";
+
+  // Server-side token mode (GITHUB_TOKEN env set) → empty token allow
   if (!t) {
-    $("#setupErr").textContent = "Token डालो, फिर Connect दबाओ";
-    return;
-  }
-  if (!t.startsWith("ghp_") && !t.startsWith("github_pat_")) {
+    t = "server";   // dummy — backend inject कर देगा
+  } else if (!t.startsWith("ghp_") && !t.startsWith("github_pat_")) {
     $("#setupErr").textContent = "Token ghp_ या github_pat_ से शुरू होना चाहिए";
     return;
   }
+
   $("#verifyBtn").disabled = true;
   $("#verifyBtn").textContent = "Connecting…";
   try {
