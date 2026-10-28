@@ -129,7 +129,6 @@ async function doUpload(doWipeFirst) {
     return;
   }
   let mapJson = ($("#mapInput").value || "").trim();
-  // Empty / Hindi placeholder / old example → full ZIP auto-map
   if (
     !mapJson ||
     mapJson.indexOf("खाली") !== -1 ||
@@ -180,14 +179,12 @@ async function doUpload(doWipeFirst) {
     if (!res.ok) throw new Error((data && data.error) || "Upload fail " + res.status);
     const jobId = data && data.job_id;
     if (!jobId) {
-      // old server without jobs
       m.classList.remove("working");
       m.innerHTML =
         '<span class="tag">AI Worker</span>\n' +
         escapeHtml((data && data.message) || "काम पूरा।");
       return;
     }
-    // Poll job status until done/error (up to \~15 min)
     let tries = 0;
     const maxTries = 180;
     while (tries < maxTries) {
@@ -381,9 +378,9 @@ $("#verifyBtn").onclick = async () => {
   let t = $("#tokenInput").value.trim();
   $("#setupErr").textContent = "";
 
-  // Server-side token mode (GITHUB_TOKEN env set) → empty token allow
-  if (!t) {
-    t = "server";   // dummy — backend inject कर देगा
+  // Server-side token mode support (GITHUB_TOKEN env)
+  if (!t || t === "server") {
+    t = "server";
   } else if (!t.startsWith("ghp_") && !t.startsWith("github_pat_")) {
     $("#setupErr").textContent = "Token ghp_ या github_pat_ से शुरू होना चाहिए";
     return;
