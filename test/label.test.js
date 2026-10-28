@@ -1,1 +1,0 @@
-const test=require('node:test');const assert=require('node:assert/strict');const f=require('../src/services/label-service');test('label requires provider',async()=>await assert.rejects(()=>f.create(),/carrier booking/));

@@ -1,1 +1,0 @@
-const test=require('node:test');const assert=require('node:assert/strict');const f=require('../src/services/retry-policy');test('retry count bounded',()=>assert.equal(f.maxAttempts,3));

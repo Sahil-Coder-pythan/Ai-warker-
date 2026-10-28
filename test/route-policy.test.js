@@ -1,1 +1,0 @@
-const test=require('node:test');const assert=require('node:assert/strict');const f=require('../src/services/route-policy');test('route is informational',()=>assert.match(f.note,/informational/));

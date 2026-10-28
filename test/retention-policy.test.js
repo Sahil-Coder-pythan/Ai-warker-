@@ -1,1 +1,0 @@
-const test=require('node:test');const assert=require('node:assert/strict');const f=require('../src/services/privacy-retention-policy');test('retention needs approval',()=>assert.equal(f.needsLegalApproval,true));

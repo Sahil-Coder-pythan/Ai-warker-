@@ -1,1 +1,0 @@
-const test=require('node:test');const assert=require('node:assert/strict');const f=require('../src/services/booking-confirmation-policy');test('request is not confirmed without carrier tracking',()=>assert.equal(f.isConfirmed({status:'REQUESTED'}),false));

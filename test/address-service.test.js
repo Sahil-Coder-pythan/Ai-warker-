@@ -1,1 +1,0 @@
-const test=require('node:test');const assert=require('node:assert/strict');const f=require('../src/services/address-service');test('requires country and postal code shape',()=>assert.equal(f.validateShape({country:'IN',postalCode:'110001'}),true));

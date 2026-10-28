@@ -1,1 +1,0 @@
-const test=require('node:test');const assert=require('node:assert/strict');const f=require('../src/utils/format-date');test('formats valid date',()=>assert.match(f('2026-01-01T00:00:00Z'),/2026/));

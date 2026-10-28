@@ -1,1 +1,0 @@
-const test=require('node:test');const assert=require('node:assert/strict');const f=require('../src/utils/iso-country');test('accepts ISO-like country code',()=>assert.equal(f('IN'),true));

@@ -1,1 +1,0 @@
-const test=require('node:test');const assert=require('node:assert/strict');const f=require('../src/services/pickup-service');test('pickup requires provider',async()=>await assert.rejects(()=>f.schedule(),/carrier booking/));

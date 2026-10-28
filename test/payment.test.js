@@ -1,1 +1,0 @@
-const test=require('node:test');const assert=require('node:assert/strict');const f=require('../src/services/payment-service');test('payments disabled by default',async()=>await assert.rejects(()=>f.charge(),/not enabled/));

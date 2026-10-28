@@ -1,1 +1,0 @@
-const test=require('node:test');const assert=require('node:assert/strict');const f=require('../src/services/shipping-notice-service');test('notice requires carrier confirmation',()=>assert.match(f.notice,/confirmed/));

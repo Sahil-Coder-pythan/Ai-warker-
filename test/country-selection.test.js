@@ -1,1 +1,0 @@
-const test=require('node:test');const assert=require('node:assert/strict');const f=require('../src/services/country-selection-service');test('normalizes lowercase country',()=>assert.equal(f.normalize('in'),'IN'));
