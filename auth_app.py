@@ -56,6 +56,18 @@ class SecurityGateway:
                 body=open(os.path.join(os.path.dirname(__file__),"public","luxury.css"),"rb").read()
                 return respond(body, headers=[("Content-Type","text/css; charset=utf-8"),("Cache-Control","no-cache")])
             except OSError: pass
+
+        # ===== FIX: Serve index.html and app.js directly (empty body problem solve) =====
+        if path in ("/", "/public/app.js"):
+            try:
+                fname = "index.html" if path == "/" else "app.js"
+                body = open(os.path.join(os.path.dirname(__file__), "public", fname), "rb").read()
+                ctype = "text/html; charset=utf-8" if path == "/" else "application/javascript; charset=utf-8"
+                return respond(body, headers=[("Content-Type", ctype), ("Cache-Control", "no-cache")])
+            except OSError:
+                pass
+        # ===== FIX END =====
+
         # If configured in Render, use the server-side GitHub token; never expose it to browser JS.
         if GITHUB_TOKEN and path.startswith("/api/") and req.method in ("POST","PUT","PATCH"):
             raw=req.get_data(cache=True)
