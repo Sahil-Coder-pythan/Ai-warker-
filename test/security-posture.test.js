@@ -1,0 +1,1 @@
+const test=require('node:test');const assert=require('node:assert/strict');const f=require('../src/services/security-posture-service');test('starter is not production ready',()=>assert.equal(f.productionReady,false));

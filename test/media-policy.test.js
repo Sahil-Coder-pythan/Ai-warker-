@@ -1,0 +1,1 @@
+const test=require('node:test');const assert=require('node:assert/strict');const f=require('../src/services/media-policy-service');test('media upload disabled by default',()=>assert.equal(f.productionReady,false));

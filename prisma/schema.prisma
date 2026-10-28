@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+model BookingRequest {
+  id               String   @id @default(cuid())
+  publicRef        String   @unique
+  status           String   @default("REQUESTED")
+  senderName       String
+  senderPhone      String
+  senderCountry    String
+  senderState      String?
+  senderPostalCode String
+  receiverName       String
+  receiverPhone      String
+  receiverCountry    String
+  receiverState      String?
+  receiverPostalCode String
+  parcelDescription String
+  weightGrams        Int
+  lengthCm           Float?
+  widthCm            Float?
+  heightCm           Float?
+  declaredValue      Decimal? @db.Decimal(12, 2)
+  currency           String   @default("INR")
+  preferredLanguage String   @default("en")
+  carrierName       String?
+  carrierTracking   String?
+  videoObjectKey    String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  events            BookingEvent[]
+  @@index([senderPhone, createdAt])
+  @@index([receiverPhone, createdAt])
+  @@index([status, createdAt])
+}
+model BookingEvent {
+  id         String   @id @default(cuid())
+  bookingId  String
+  status     String
+  note       String
+  createdAt  DateTime @default(now())
+  booking    BookingRequest @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  @@index([bookingId, createdAt])
+}
+
+model Account {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime @default(now())
+  products     Product[]
+  purchases    ShopOrder[] @relation("buyer")
+  sales        ShopOrder[] @relation("seller")
+}
+model Product {
+  id          String   @id @default(cuid())
+  sellerId    String
+  seller      Account  @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  shopName    String
+  city        String   @default("")
+  title       String
+  description String   @default("")
+  price       Decimal  @db.Decimal(14, 2)
+  mrp         Decimal  @default(0) @db.Decimal(14, 2)
+  currency    String   @default("INR")
+  category    String   @default("Other")
+  days        Int      @default(5)
+  sellerPhone   String @default("")
+  sellerAddress String @default("")
+  expiresAt   DateTime?
+  image       Bytes
+  createdAt   DateTime @default(now())
+  @@index([createdAt])
+  @@index([sellerId])
+  @@index([expiresAt])
+}
+model ShopOrder {
+  id            String   @id @default(cuid())
+  ref           String   @unique
+  buyerId       String
+  buyer         Account  @relation("buyer", fields: [buyerId], references: [id])
+  sellerId      String
+  seller        Account  @relation("seller", fields: [sellerId], references: [id])
+  status        String   @default("PLACED")
+  paymentMethod String   @default("COD")
+  sellerPhone   String   @default("")
+  sellerShop    String   @default("")
+  currency      String
+  total         Decimal  @db.Decimal(14, 2)
+  name          String
+  phone         String
+  address       String
+  city          String
+  country       String
+  pincode       String
+  createdAt     DateTime @default(now())
+  items         ShopOrderItem[]
+  @@index([buyerId, createdAt])
+  @@index([sellerId, createdAt])
+}
+model ShopOrderItem {
+  id        String    @id @default(cuid())
+  orderId   String
+  order     ShopOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  title     String
+  unitPrice Decimal   @db.Decimal(14, 2)
+  qty       Int
+}

@@ -1,0 +1,3 @@
+<% layout('layout') -%>
+<section class="page-heading"><div class="eyebrow">TRACK A REQUEST</div><h1><%= t.trackBooking %></h1><p>For privacy, enter both the request reference and the phone number attached to it.</p></section>
+<form class="panel form-grid" id="track-form"><label>Booking reference<input name="publicRef" placeholder="ST-XXXXXXXXXX" required></label><label><%= t.phoneNumber %><input name="phone" required></label><button class="button primary full" type="submit"><%= t.search %></button><div id="track-result" class="full" role="status"></div></form>

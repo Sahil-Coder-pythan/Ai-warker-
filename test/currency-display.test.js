@@ -1,0 +1,1 @@
+const test=require('node:test');const assert=require('node:assert/strict');const f=require('../src/services/market-currency-policy');test('does not promise conversion',()=>assert.match(f.note,/FX/));

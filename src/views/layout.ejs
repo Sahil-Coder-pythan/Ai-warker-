@@ -1,0 +1,7 @@
+<!doctype html>
+<html lang="<%= lang %>">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#071a2d"><title><%= title %> · Stratic Market</title><link rel="stylesheet" href="/static/css/main.css"></head>
+<body>
+<header class="topbar"><a class="brand" href="/">STRATIC <span>MARKET</span></a><nav><a href="/shop">Shop</a><a href="/book-parcel"><%= t.bookParcel %></a><a href="/track"><%= t.trackBooking %></a><a href="/help"><%= t.help %></a></nav>
+<form action="/" method="get" class="lang-form"><label for="lang"><%= t.language %></label><select id="lang" name="lang" onchange="this.form.submit()"><% supportedLanguages.forEach(code => { %><option value="<%= code %>" <%= code===lang?'selected':'' %>><%= code.toUpperCase() %></option><% }) %></select></form></header>
+<main class="container"><%- body %></main><footer><span>Stratic Market</span><span><a href="/privacy"><%= t.privacy %></a> · <a href="/terms"><%= t.terms %></a></span></footer><script src="/static/js/main.js" defer></script></body></html>

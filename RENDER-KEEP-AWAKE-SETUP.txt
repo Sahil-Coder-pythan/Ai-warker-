@@ -1,0 +1,28 @@
+STRATIC MARKET — RENDER KEEP-AWAKE SETUP
+==========================================
+
+The app already has a lightweight health endpoint in:
+  src/routes/web.js
+  GET /health
+It returns HTTP 200 JSON when the app is running, so no application-code changes are needed.
+
+To configure cron-job.org:
+1. Deploy this ZIP to Render as you normally do.
+2. Copy your public Render service URL, for example:
+   https://YOUR-SERVICE.onrender.com
+3. Open https://console.cron-job.org/ and sign in/create an account.
+4. Create a cron job with URL:
+   https://YOUR-SERVICE.onrender.com/health
+5. Set it to run every 5 minutes and enable the job.
+6. Run it once manually and check that the response is successful (HTTP 200).
+
+Important:
+- Replace YOUR-SERVICE with the actual Render service hostname.
+- I cannot create/activate the cron job inside your account from this ZIP.
+- External pings are a workaround, not a guarantee or an officially supported way
+  to keep a Render Free service continuously awake. Render may still restart it,
+  and free services can spin down under platform conditions.
+- This only addresses idle spin-down. It does not fix crashes, deployment errors,
+  database availability, or ephemeral filesystem limitations.
+- No existing application files were changed for this keep-awake setup because
+  /health already exists.

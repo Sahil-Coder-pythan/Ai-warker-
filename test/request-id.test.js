@@ -1,0 +1,1 @@
+const test=require('node:test');const assert=require('node:assert/strict');const f=require('../src/utils/request-id');test('creates UUID request ID',()=>assert.match(f(),/^[0-9a-f-]{36}$/i));

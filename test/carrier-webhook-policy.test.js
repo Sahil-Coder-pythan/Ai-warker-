@@ -1,0 +1,1 @@
+const test=require('node:test');const assert=require('node:assert/strict');const f=require('../src/services/carrier-webhook-policy');test('webhooks require signatures',()=>assert.match(f.note,/signature/));

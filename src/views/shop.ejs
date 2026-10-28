@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="<%= lang %>">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/static/img/stratic-icon-192.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/static/img/stratic-icon-192.svg">
+<title>Stratic Market</title>
+<link rel="stylesheet" href="/static/css/shop.css?v=20261028-chat">
+</head>
+<body>
+<header class="am-top">
+  <div class="am-brand">
+    <span class="am-box-logo" aria-hidden="true">
+      <svg width="28" height="28" viewBox="0 0 32 32" fill="none"><rect x="4" y="10" width="24" height="16" rx="3" fill="#ff7a00"/><path d="M4 14h24" stroke="#fff" stroke-width="1.5"/><path d="M16 10V6" stroke="#ff7a00" stroke-width="2"/><path d="M11 10l5-4 5 4" stroke="#ff7a00" stroke-width="2" fill="none"/></svg>
+    </span>
+    <div class="am-logo">stratic<span>market</span></div>
+  </div>
+  <div class="am-top-right">
+    <button type="button" id="open-help" class="am-icon-btn" aria-label="Help" title="Help">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
+    </button>
+    <button type="button" id="open-chat" class="am-icon-btn am-chat-btn" aria-label="Stratic Market Chat" title="Chat">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>
+      <span id="chat-badge" class="am-chat-badge" hidden>0</span>
+    </button>
+    <button type="button" id="top-avatar" class="am-icon-btn am-bell guest" aria-label="Account / Sign in" title="Account / Sign in">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2c0 .5-.2 1-.6 1.4L4 17h5"/><path d="M9 17v1a3 3 0 0 0 6 0v-1"/></svg>
+      <span class="am-avatar-letter" hidden aria-hidden="true">S</span>
+    </button>
+  </div>
+</header>
+
+<div class="am-sheet">
+  <div class="am-search-wrap">
+    <span class="am-search-ico" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+    </span>
+    <input id="q" type="search" placeholder="Search for products, brands and more..." aria-label="Search">
+    <button type="button" class="am-mic" aria-label="Voice" tabindex="-1">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg>
+    </button>
+  </div>
+
+  <!-- Editorial category showcase: real photography, not fake product listings -->
+  <section class="sm-showcase" aria-label="Explore marketplace categories">
+    <div class="sm-showcase-head">
+      <div><span class="sm-eyebrow">STRATIC MARKET • DISCOVER</span><h1>Something for every day</h1><p>Explore styles, essentials and little things you love.</p></div>
+      <span class="sm-spark" aria-hidden="true">✦</span>
+    </div>
+    <div class="sm-photo-grid">
+      <button type="button" class="sm-photo-card sm-photo-tall" data-c="Women">
+        <img src="/static/img/categories/womens-fashion.webp" alt="Elegant women's fashion" loading="eager" decoding="sync" fetchpriority="high">
+        <span class="sm-photo-shade"></span><span class="sm-photo-copy"><small>NEW SEASON</small><b>Women’s Style</b><em>Explore fashion ↗</em></span>
+      </button>
+      <button type="button" class="sm-photo-card" data-c="Fashion">
+        <img src="/static/img/categories/clothing.webp" alt="Everyday clothing" loading="eager" decoding="sync" fetchpriority="high">
+        <span class="sm-photo-shade"></span><span class="sm-photo-copy"><small>EVERYDAY PICKS</small><b>Wardrobe Basics</b></span>
+      </button>
+      <button type="button" class="sm-photo-card" data-c="Footwear">
+        <img src="/static/img/categories/sneakers.webp" alt="Sneakers" loading="eager" decoding="sync" fetchpriority="high">
+        <span class="sm-photo-shade"></span><span class="sm-photo-copy"><small>STEP OUT</small><b>Shoes & Sneakers</b></span>
+      </button>
+      <button type="button" class="sm-photo-card" data-c="Beauty">
+        <img src="/static/img/categories/beauty.webp" alt="Beauty and skincare products" loading="eager" decoding="sync" fetchpriority="high">
+        <span class="sm-photo-shade"></span><span class="sm-photo-copy"><small>SELF-CARE</small><b>Beauty & Care</b></span>
+      </button>
+      <button type="button" class="sm-photo-card" data-c="Home">
+        <img src="/static/img/categories/home-living.webp" alt="Warm modern home interior" loading="eager" decoding="sync" fetchpriority="high">
+        <span class="sm-photo-shade"></span><span class="sm-photo-copy"><small>MAKE IT YOURS</small><b>Home & Living</b></span>
+      </button>
+      <button type="button" class="sm-photo-card" data-c="Jewellery">
+        <img src="/static/img/categories/jewellery.webp" alt="Jewellery accessories" loading="eager" decoding="sync" fetchpriority="high">
+        <span class="sm-photo-shade"></span><span class="sm-photo-copy"><small>THE FINISHING TOUCH</small><b>Jewellery</b></span>
+      </button>
+      <button type="button" class="sm-photo-card" data-c="Books">
+        <img src="/static/img/categories/books.webp" alt="Books on a shelf" loading="eager" decoding="sync" fetchpriority="high">
+        <span class="sm-photo-shade"></span><span class="sm-photo-copy"><small>TURN A PAGE</small><b>Books & Learning</b></span>
+      </button>
+      <button type="button" class="sm-photo-card" data-c="Kids">
+        <img src="/static/img/categories/toys.webp" alt="Colourful toys for children" loading="eager" decoding="sync" fetchpriority="high">
+        <span class="sm-photo-shade"></span><span class="sm-photo-copy"><small>LITTLE JOYS</small><b>Toys & Kids</b></span>
+      </button>
+      <button type="button" class="sm-photo-card" data-c="Electronics">
+        <img src="/static/img/categories/headphones.webp" alt="Wireless headphones" loading="eager" decoding="sync" fetchpriority="high">
+        <span class="sm-photo-shade"></span><span class="sm-photo-copy"><small>TECH ESSENTIALS</small><b>Electronics</b></span>
+      </button>
+    </div>
+    <p class="sm-showcase-note">Category inspiration only · Product listings appear here when sellers upload them.</p>
+  </section>
+
+  <section class="sm-promise" aria-label="Why sell on Stratic Market">
+    <div class="sm-promise-top"><small>FOR SELLERS</small><b>0% commission</b></div>
+    <ul>
+      <li><span>💰</span>Customer pays <b>your own QR</b>, straight to you</li>
+      <li><span>💬</span>Buyers can <b>chat with you on WhatsApp</b></li>
+      <li><span>🔗</span>Your <b>own shop link</b> to share anywhere</li>
+      <li><span>⚡</span>Open your shop in <b>2 minutes</b>: photo, price, QR</li>
+    </ul>
+    <button type="button" class="sm-promise-btn" id="promise-sell">Open my shop</button>
+  </section>
+
+  <div id="city-strip" class="city-strip" hidden></div>
+
+  <div class="am-chip-row" id="tabs">
+    <!-- filled by JS; fallback chips -->
+    <button type="button" class="am-chip on" data-c="All"><span class="chip-ico">▦</span>All</button>
+    <button type="button" class="am-chip" data-c="Mobiles"><span class="chip-ico">📱</span>Mobiles</button>
+    <button type="button" class="am-chip" data-c="Fashion"><span class="chip-ico">👕</span>Fashion</button>
+    <button type="button" class="am-chip" data-c="Electronics"><span class="chip-ico">⚡</span>Electronics</button>
+    <button type="button" class="am-chip" data-c="Home"><span class="chip-ico">🔌</span>Home</button>
+  </div>
+
+  <div class="am-bar" hidden>
+    <h1 id="head">All products</h1>
+    <select id="sort" aria-label="Sort">
+      <option value="new">Sort: Newest</option>
+      <option value="lo">Price: low to high</option>
+      <option value="hi">Price: high to low</option>
+    </select>
+  </div>
+
+  <main id="grid" class="am-grid">
+    <div class="am-empty-box">
+      <div class="empty-illu" aria-hidden="true">
+        <svg width="300" height="250" viewBox="0 0 300 250" fill="none">
+          <g stroke="#28211b" stroke-width="2.1" stroke-linejoin="round" stroke-linecap="round">
+            <path d="M75 92 151 51 230 84 153 126Z" fill="#d8c3a8"/>
+            <path d="M75 92 42 58 131 28 151 51Z" fill="#dfccb4"/>
+            <path d="M151 51 176 25 266 53 230 84Z" fill="#e3d1b9"/>
+            <path d="M75 92 46 126 113 157 153 126Z" fill="#d6bea0"/>
+            <path d="M230 84 263 125 190 157 153 126Z" fill="#d8c3a8"/>
+            <path d="M75 92 153 126 230 84" fill="#bfa98d"/>
+            <path d="M75 92 75 190 153 222 153 126Z" fill="#d9c4a8"/>
+            <path d="M153 126 230 84 230 184 153 222Z" fill="#cbb697"/>
+            <path d="M42 58 58 61M69 54l15-4M186 44l57 18M61 133l50 21M199 145l42-19" stroke-width="1.5"/>
+            <path d="M85 100 135 122M168 128l48-29M85 182l1 7M94 192l8 3M215 190l-7 3M169 213l34-13" stroke-width="1.5"/>
+            <path d="M153 126v96" stroke-width="1.5"/>
+          </g>
+        </svg>
+      </div>
+      <h2 class="empty-title">Your Bazaar is Empty</h2>
+      <p class="empty-sub">Be the first to sell from your city to the World</p>
+      <button type="button" class="am-cta" id="empty-sell">Sell Your First Product +</button>
+    </div>
+  </main>
+</div>
+
+
+<nav class="am-nav">
+  <a href="/shop" class="on" data-tab="home" id="nav-home"><span class="ni"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg></span><span>Home</span></a>
+  <a href="#" data-tab="cats" id="nav-cats"><span class="ni"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span><span>Categories</span></a>
+  <button type="button" id="open-sell" class="am-plus" aria-label="Sell">+</button>
+  <a href="#" id="open-cart2"><span class="ni"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6h15l-1.5 9h-12z"/><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M6 6L5 3H2"/></svg></span><span>Cart</span><b id="cart-n2" class="nav-badge">0</b></a>
+  <a href="#" id="open-acc"><span class="ni"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg></span><span>Profile</span></a>
+</nav>
+<button type="button" id="open-assistant-fab" class="assistant-fab" aria-label="Open Market Assistant"><span>✦</span><b>AI Help</b></button>
+<!-- hidden legacy cart badge for JS -->
+<a class="am-cart-top" id="open-cart" href="#" hidden aria-hidden="true">🛒<b id="cart-n">0</b></a>
+<dialog id="cats-dlg">
+  <div class="am-row"><h2>Categories</h2><button type="button" id="cats-close" class="am-x">✕</button></div>
+    <div class="cat-list" id="cat-list">
+    <button type="button" data-c="All" class="cat-item on">All products</button>
+    <button type="button" data-c="Mobiles" class="cat-item">Mobiles &amp; Accessories</button>
+    <button type="button" data-c="Laptops" class="cat-item">Laptops &amp; Computers</button>
+    <button type="button" data-c="Electronics" class="cat-item">Electronics</button>
+    <button type="button" data-c="TV" class="cat-item">TV &amp; Appliances</button>
+    <button type="button" data-c="Fashion" class="cat-item">Men's Fashion</button>
+    <button type="button" data-c="Women" class="cat-item">Women's Fashion</button>
+    <button type="button" data-c="Kids" class="cat-item">Kids &amp; Baby</button>
+    <button type="button" data-c="Footwear" class="cat-item">Footwear</button>
+    <button type="button" data-c="Watches" class="cat-item">Watches</button>
+    <button type="button" data-c="Jewellery" class="cat-item">Jewellery</button>
+    <button type="button" data-c="Beauty" class="cat-item">Beauty &amp; Personal Care</button>
+    <button type="button" data-c="Health" class="cat-item">Health &amp; Household</button>
+    <button type="button" data-c="Home" class="cat-item">Home &amp; Kitchen</button>
+    <button type="button" data-c="Furniture" class="cat-item">Furniture</button>
+    <button type="button" data-c="Garden" class="cat-item">Garden &amp; Outdoor</button>
+    <button type="button" data-c="Grocery" class="cat-item">Grocery &amp; Gourmet</button>
+    <button type="button" data-c="Sports" class="cat-item">Sports &amp; Fitness</button>
+    <button type="button" data-c="Automotive" class="cat-item">Cars &amp; Motorbike</button>
+    <button type="button" data-c="Tools" class="cat-item">Tools &amp; Home Improvement</button>
+    <button type="button" data-c="Books" class="cat-item">Books</button>
+    <button type="button" data-c="Movies" class="cat-item">Movies &amp; Music</button>
+    <button type="button" data-c="Gaming" class="cat-item">Video Games</button>
+    <button type="button" data-c="Toys" class="cat-item">Toys &amp; Games</button>
+    <button type="button" data-c="Pet" class="cat-item">Pet Supplies</button>
+    <button type="button" data-c="Office" class="cat-item">Office Products</button>
+    <button type="button" data-c="Industrial" class="cat-item">Industrial &amp; Scientific</button>
+    <button type="button" data-c="Luggage" class="cat-item">Luggage &amp; Bags</button>
+    <button type="button" data-c="Handmade" class="cat-item">Handmade</button>
+    <button type="button" data-c="Deals" class="cat-item">Today's Deals</button>
+    <button type="button" data-c="New" class="cat-item">New Releases</button>
+    <button type="button" data-c="Prime" class="cat-item">Best Sellers</button>
+    <button type="button" data-c="Gift" class="cat-item">Gift Cards</button>
+    <button type="button" data-c="Subscribe" class="cat-item">Subscribe &amp; Save</button>
+    <button type="button" data-c="Coupons" class="cat-item">Coupons</button>
+    <button type="button" data-c="Customer" class="cat-item">Customer Service</button>
+    <button type="button" data-c="Sell" class="cat-item">Sell on Stratic</button>
+    <button type="button" data-c="Registry" class="cat-item">Gift Registry</button>
+    <button type="button" data-c="Pharmacy" class="cat-item">Pharmacy</button>
+    <button type="button" data-c="Other" class="cat-item">Other</button>
+  </div>
+</dialog>
+
+<div id="ok-order" class="ok-screen" hidden role="alertdialog" aria-live="assertive">
+  <div class="ok-wrap">
+    <div class="ok-circle" id="ok-circle"><svg viewBox="0 0 52 52" width="92" height="92"><circle cx="26" cy="26" r="24" fill="none" stroke="#fff" stroke-width="3"/><path d="M14 27l8 8 16-17" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <h2 id="ok-title">Order confirmed!</h2>
+    <p id="ok-ref" class="ok-ref"></p>
+    <p class="ok-sub" id="ok-sub">Cash on Delivery · The seller will contact you soon.<br>Track it anytime in Profile → My orders.</p>
+    <button type="button" id="ok-view" class="ok-btn">View my orders</button>
+    <button type="button" id="ok-close" class="ok-btn ghost">Continue shopping</button>
+  </div>
+</div>
+
+<dialog id="sell">
+<form id="sell-form">
+  <div class="am-row"><h2>Sell a product</h2><button type="button" id="sell-close" class="am-x">✕</button></div>
+  <div class="sp-box">
+    <div class="sp-top">
+      <label class="sp-btn"><span class="sp-ic">&#128247;</span><span id="sp-cam-t">Camera</span><input type="file" id="photo-cam" accept="image/*" capture="environment" hidden></label>
+      <label class="sp-btn"><span class="sp-ic">&#128444;</span><span id="sp-gal-t">Gallery</span><input type="file" id="photo-gal" accept="image/*" multiple hidden></label>
+    </div>
+    <label class="sp-switch"><input type="checkbox" id="rm" checked><i></i><span id="rm-t">Auto white background: ON</span></label>
+    <p class="sp-hint">Upload as many product photos as you need (up to 12). No fake/auto-generated extra photos are added.</p>
+    <label class="sp-qr-upload"><span class="sp-qr-title">▦ Seller payment QR <em>PRIVATE</em></span><span class="sp-qr-subtitle">Upload your own scannable UPI / payment QR</span><input type="file" id="pay-qr-upload" accept="image/jpeg,image/png,image/webp"><small>Only a scannable QR is accepted. Product photos and ordinary images are rejected. Your QR is private to this product and is displayed to a buyer only after they choose online payment.</small><div id="pay-qr-status" class="sp-qr-status" role="status" hidden></div><img id="pay-qr-preview" alt="Private payment QR preview" hidden></label>
+    <img id="prev" alt="" hidden>
+    <div id="prev-t" hidden></div>
+    <div id="prev-strip" class="sp-strip" hidden></div>
+    <p class="sp-hint" id="sp-hint"></p>
+    <p id="proc" role="status"></p>
+  </div>
+  <label>Product name<input name="title" maxlength="140" required placeholder="e.g. Wireless Headphones"></label>
+  <div class="am-2">
+    <label>Price<input name="price" type="number" min="1" step="any" required></label>
+    <label>MRP (optional)<input name="mrp" type="number" min="1" step="any" placeholder="Original price"></label>
+  </div>
+  <label>Category
+    <select name="category">
+      <option>Mobiles</option><option>Laptops</option><option>Electronics</option><option>TV</option>
+      <option>Fashion</option><option>Women</option><option>Kids</option><option>Footwear</option>
+      <option>Watches</option><option>Jewellery</option><option>Beauty</option><option>Health</option>
+      <option>Home</option><option>Furniture</option><option>Garden</option><option>Grocery</option>
+      <option>Sports</option><option>Automotive</option><option>Tools</option><option>Books</option>
+      <option>Movies</option><option>Gaming</option><option>Toys</option><option>Pet</option>
+      <option>Office</option><option>Luggage</option><option>Handmade</option><option>Pharmacy</option>
+      <option>Other</option>
+    </select>
+  </label>
+  <label>Description<textarea name="description" maxlength="500" rows="2" placeholder="Condition, details…"></textarea></label>
+  <label>Expiry date (if any)
+    <input name="expiresAt" type="date" id="expiresAt">
+  </label>
+  <p class="am-warn">⚠️ Do not list expired products. Expired items are rejected. Listing them can lead to account action / case.</p>
+  <label>Your name / shop<input name="seller" maxlength="60" required></label>
+  <label>Your name<input name="name" type="text" required minlength="2" maxlength="60" placeholder="Your full name" autocomplete="name"></label>
+  <label>Mobile number<input name="phone" type="tel" maxlength="20" required placeholder="10-digit number"></label>
+  <label>Full shop address<textarea name="address" maxlength="300" rows="2" required placeholder="House/shop, street, village or area"></textarea></label>
+  <div class="am-2"><label>City / Town<input name="city" maxlength="80" required placeholder="City or town"></label><label>District<input name="district" maxlength="80" placeholder="District / Zila"></label></div>
+  <label>Currency
+    <select name="currency">
+      <option value="INR" selected>₹ INR</option>
+      <option value="USD">$ USD</option>
+      <option value="EUR">€ EUR</option>
+      <option value="GBP">£ GBP</option>
+    </select>
+  </label>
+  <p id="sell-msg" role="status"></p>
+  <div class="am-row">
+    <button type="button" id="sell-cancel" class="am-btn dark">Cancel</button>
+    <button type="submit" class="am-btn y">Post product</button>
+  </div>
+</form>
+</dialog>
+
+<dialog id="buy">
+  <div class="am-row"><h2>Buy Now</h2><button type="button" id="buy-close" class="am-x">✕</button></div>
+  <p class="am-t" id="buy-title"></p>
+  <p class="am-price"><b id="buy-price"></b></p>
+  <p class="am-s" id="buy-seller"></p>
+  <div class="buy-box">
+    <div class="buy-label">Seller phone number</div>
+    <div class="buy-phone" id="buy-phone">—</div>
+    <p class="am-note">No online payment yet. Call / WhatsApp the seller. Cash on Delivery can be arranged with them.</p>
+    <div class="am-btns" style="margin-top:12px">
+      <a id="buy-call" class="am-btn y" style="text-align:center;text-decoration:none">📞 Call</a>
+      <a id="buy-wa" class="am-btn" style="background:#25d366;color:#fff;text-align:center;text-decoration:none">WhatsApp</a>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="gal">
+  <div class="gp-bar"><button type="button" id="gal-close" class="gp-back" aria-label="Back">←</button><span id="gal-title" class="gp-bt"></span></div>
+  <div id="gal-page"></div>
+</dialog>
+
+<dialog id="cart">
+  <div class="am-row"><h2>Your cart</h2><button type="button" id="cart-close" class="am-x">✕</button></div>
+  <div id="cart-list"></div>
+  <p class="am-note">Cart is saved on this phone. Choose Cash on Delivery or online payment at checkout.</p>
+</dialog>
+
+<dialog id="acc" class="premium-dialog account-dialog">
+  <div class="am-row"><div><p class="dialog-eyebrow">STRATIC MARKET</p><h2>Account</h2></div><button type="button" id="acc-close" class="am-x">✕</button></div>
+  <div id="acc-body"></div>
+</dialog>
+
+<dialog id="ai-assistant" class="premium-dialog assistant-dialog">
+  <div class="assistant-head"><div class="assistant-mark">✦</div><div class="assistant-head-copy"><h2>Market Assistant</h2><p>Your personal guide to Stratic Market</p></div><button type="button" id="assistant-close" class="am-x" aria-label="Close assistant">✕</button></div>
+  <div class="assistant-welcome"><strong>Hi! How can I help you today?</strong><p>I can guide you around the marketplace, help with products and explain safety rules.</p></div>
+  <div class="assistant-quick" id="assistant-quick">
+    <button type="button" data-assist="dashboard">My Product Dashboard</button>
+    <button type="button" data-assist="upload">How to upload a product</button>
+    <button type="button" data-assist="electronics">Find electronics</button>
+    <button type="button" data-assist="orders">My orders</button>
+  </div>
+  <div id="assistant-chat" class="assistant-chat" aria-live="polite"></div>
+  <form id="assistant-form" class="assistant-form"><input id="assistant-input" autocomplete="off" maxlength="300" placeholder="Ask about products, categories or orders…" aria-label="Ask Market Assistant"><button type="submit" aria-label="Send message">➤</button></form>
+</dialog>
+
+<dialog id="co">
+<form id="co-form">
+  <div class="am-row"><h2>Delivery details</h2><button type="button" id="co-close" class="am-x">✕</button></div>
+  <p id="co-item" class="am-note" hidden></p>
+  <label>Full name<input name="name" maxlength="80" required></label>
+  <label>Phone<input name="phone" type="tel" maxlength="20" required></label>
+  <label>Address<textarea name="address" maxlength="300" rows="2" required></textarea></label>
+  <div class="am-2">
+    <label>City / Town<input name="city" maxlength="80" required></label>
+    <label>District / Zila<input name="district" maxlength="80" placeholder="District / Zila"></label>
+  </div>
+  <label>State / Province<input name="state" maxlength="80" placeholder="State / Province" required></label>
+  <label>Pincode<input name="pincode" maxlength="20" required></label>
+  <label>Country<input name="country" maxlength="80" required value="India"></label>
+  <div class="co-sec">
+    <b id="co-pay-h">Payment method</b>
+    <label class="co-opt"><input type="radio" name="pay" value="COD" checked><span class="co-opt-b"><b id="co-cod-t">Cash on Delivery</b><small id="co-cod-s">Pay when the parcel arrives. +&#8377;49 delivery fee</small></span></label>
+    <label class="co-opt" id="co-online-l"><input type="radio" name="pay" value="ONLINE"><span class="co-opt-b"><b id="co-on-t">Pay online (UPI / QR)</b><small id="co-on-s">Exact product price. No extra charge</small></span></label>
+  </div>
+  <div id="co-qr" class="co-qr" hidden>
+    <div id="co-qr-top"></div>
+    <label class="co-txn"><span id="co-txn-t"></span><input name="txn" maxlength="30" autocomplete="off" placeholder="e.g. 412345678901"></label>
+  </div>
+  <div class="co-sec" id="co-sum"></div>
+  <ul class="co-trust" id="co-trust"></ul>
+  <div class="co-more" id="co-more-w" hidden><b id="co-more-h">More products you may like</b><div id="co-more" class="co-strip"></div></div>
+  <p id="co-msg" role="status"></p>
+  <div class="co-actions">
+    <button type="button" id="co-cancel" class="am-btn dark">Cancel</button>
+    <button type="submit" id="co-place" class="am-btn y">Place order</button>
+  </div>
+</form>
+</dialog>
+
+<dialog id="ord">
+  <div class="am-row"><h2 id="ord-h">Orders</h2><button type="button" id="ord-close" class="am-x">✕</button></div>
+  <div id="ord-body"></div>
+</dialog>
+
+<div id="auth" class="au" hidden>
+  <a href="#" id="au-skip" class="au-skip">Skip sign in ›</a>
+  <div class="au-logo">stratic<span>market</span></div>
+  <form id="au-form" class="au-card">
+    <h1 id="au-h">Sign in</h1>
+    <label id="au-name-l" hidden>Your name<input name="name" maxlength="60" autocomplete="name"></label>
+    <label>Email<input name="email" type="email" required autocomplete="email"></label>
+    <label>Password<input name="password" type="password" minlength="6" required autocomplete="current-password"></label>
+    <label id="au-phone-l" hidden>Mobile number<input name="phone" type="tel" maxlength="20" autocomplete="tel" placeholder="+91..."></label>
+    <label id="au-country-l" hidden>Country
+      <select name="country">
+        <option value="IN">India</option>
+        <option value="US">United States</option>
+        <option value="GB">United Kingdom</option>
+        <option value="AE">UAE</option>
+        <option value="OTHER">Other</option>
+      </select>
+    </label>
+    <label id="au-lang-l" hidden>Language
+      <select name="lang">
+        <option value="en">English</option>
+        <option value="hi">हिन्दी</option>
+        <option value="ta">தமிழ்</option>
+        <option value="te">తెలుగు</option>
+        <option value="mr">मराठी</option>
+      </select>
+    </label>
+    <p id="au-m" role="status"></p>
+    <button id="au-go" class="au-btn" type="submit">Continue</button>
+    <a href="/shop/api/google/start" class="au-btn" id="au-google" style="display:block;text-align:center;margin-top:10px;background:#fff;color:#222;border:1px solid #ddd;text-decoration:none">Continue with Google</a>
+    <p class="au-note">New? <a href="#" id="au-sw">Create your account</a></p>
+    <p class="au-note" style="font-size:11px;color:#666">One mobile number = one account. You cannot buy your own products by switching Gmail.</p>
+  </form>
+</div>
+
+<dialog id="gphone">
+<form id="gphone-form" autocomplete="tel">
+  <div class="gp-crest" aria-hidden="true">&#9670;</div>
+  <h2 class="gp-title">Enter your mobile number</h2>
+  <p class="gp-sub">Your Gmail is verified. Tell us your name and mobile number to open your marketplace. Your name becomes your shop name. Your products stay safe with this Gmail + mobile.</p>
+  <label>Mobile number<input name="phone" type="tel" inputmode="tel" required maxlength="20" placeholder="98765 43210" autocomplete="tel"></label>
+  <label>Country
+    <select name="country">
+      <option value="IN">India (+91)</option>
+      <option value="US">United States</option>
+      <option value="GB">United Kingdom</option>
+      <option value="AE">UAE</option>
+      <option value="OTHER">Other (add country code)</option>
+    </select>
+  </label>
+  <label>Language
+    <select name="lang">
+      <option value="en">English</option><option value="hi">हिन्दी</option><option value="bn">বাংলা</option><option value="te">తెలుగు</option><option value="mr">मराठी</option>
+      <option value="ta">தமிழ்</option><option value="gu">ગુજરાતી</option><option value="kn">ಕನ್ನಡ</option><option value="ml">മലയാളം</option><option value="pa">ਪੰਜਾਬੀ</option>
+    </select>
+  </label>
+  <p id="gphone-msg" role="status"></p>
+  <button type="submit" class="am-btn y gp-done">Done</button>
+</form>
+</dialog>
+
+<dialog id="help-dlg">
+  <div class="am-row"><h2>Help — How Stratic works</h2><button type="button" id="help-close" class="am-x">✕</button></div>
+  <div class="help-body" style="font-size:14px;line-height:1.55;padding:8px 0;max-height:70vh;overflow:auto">
+    <h3 style="margin:12px 0 6px;color:#c45500">Sell a product</h3>
+    <ol style="padding-left:18px">
+      <li>Tap the orange <b>+</b> button in the bottom bar.</li>
+      <li>Choose photo (Camera or Gallery). Optional: Auto white background.</li>
+      <li>Fill name, price, category, mobile, address.</li>
+      <li>Tap <b>Post product</b> — it shows to buyers in your country.</li>
+    </ol>
+    <h3 style="margin:12px 0 6px;color:#c45500">Buy / Order</h3>
+    <ol style="padding-left:18px">
+      <li>Open any product → <b>Add to Cart</b> or <b>Buy Now</b>.</li>
+      <li>Buy Now / Checkout asks your delivery details and confirms the order instantly with an order ID.</li>
+      <li>Cash on Delivery. Track your order in Profile → My orders.</li>
+      <li>You cannot buy your own product (same mobile number).</li>
+    </ol>
+    <h3 style="margin:12px 0 6px;color:#c45500">Account &amp; safety</h3>
+    <ul style="padding-left:18px">
+      <li>One mobile number = one account. Switching Gmail does not let you buy your own listings.</li>
+      <li>Products stay in the same country only (India ↔ India, etc.).</li>
+      <li>Do not list expired goods — they get rejected.</li>
+      <li>Stay logged in until you tap Logout in Profile.</li>
+    </ul>
+    <h3 style="margin:12px 0 6px;color:#c45500">Profile</h3>
+    <p>Bottom <b>Profile</b> → My listings, My orders, Logout.</p>
+    <p style="margin-top:12px;color:#666;font-size:12px">Questions? The seller’s phone is shown in your order details.</p>
+  </div>
+</dialog>
+
+<script src="/static/js/i18n-shop.js?v=20261026-complete-language-fix"></script>
+<script src="/static/js/qr-mini.js?v=20261025"></script>
+<script src="/static/js/shop.js?v=20261026-local-art"></script>
+<script>if ("serviceWorker" in navigator) { window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {})); }</script>
+</body>
+</html>

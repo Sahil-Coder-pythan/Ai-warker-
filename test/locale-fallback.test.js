@@ -1,0 +1,1 @@
+const test=require('node:test');const assert=require('node:assert/strict');const f=require('../src/services/locale-fallback-service');test('unknown key falls back to key',()=>assert.equal(f.message('en','notAKey'),'notAKey'));

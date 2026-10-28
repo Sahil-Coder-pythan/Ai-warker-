@@ -1,0 +1,1 @@
+const test=require('node:test');const assert=require('node:assert/strict');const f=require('../src/services/otp-rate-policy');test('otp attempts are capped',()=>assert.equal(f.maxAttempts,5));

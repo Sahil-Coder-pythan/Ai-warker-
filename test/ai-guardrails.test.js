@@ -1,0 +1,1 @@
+const test=require('node:test');const assert=require('node:assert/strict');const f=require('../src/services/ai-guardrails-service');test('guardrail warns against fabricated booking claims',()=>assert.match(f.systemRules,/Never invent/));
